@@ -1,0 +1,17 @@
+[package]
+name = "saturnix_filter"
+version = "0.1.0"
+edition = "2021"
+rust-version = "1.75"
+description = "High-performance camera film simulation filters"
+license = "MIT"
+repository = "https://github.com/oberbichler/saturnix-filter"
+authors = ["Thomas Oberbichler <thomas.oberbichler@gmail.com>"]
+
+[lib]
+name = "saturnix_filter"
+crate-type = ["cdylib"]
+
+[dependencies]
+pyo3 = { version = "0.21.0", features = ["extension-module", "abi3-py39"] }
+rayon = "1.10"

@@ -1,0 +1,17 @@
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.venv/
+env/
+venv/
+dist/
+build/
+*.egg-info/
+
+# Rust
+target/
+
+# macOS
+.DS_Store

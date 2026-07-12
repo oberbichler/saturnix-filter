@@ -1,0 +1,38 @@
+[build-system]
+requires = ["maturin>=1.5,<2.0"]
+build-backend = "maturin"
+
+[project]
+name = "saturnix-filter"
+version = "0.1.0"
+description = "High-performance camera film simulation filters"
+readme = "README.md"
+license = "MIT"
+authors = [
+    { name = "Thomas Oberbichler", email = "thomas.oberbichler@gmail.com" },
+]
+requires-python = ">=3.9"
+dependencies = [
+    "pillow>=10.0.0",
+    "numpy>=1.20.0",
+]
+classifiers = [
+    "Programming Language :: Rust",
+    "Programming Language :: Python :: Implementation :: CPython",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent",
+    "Topic :: Multimedia :: Graphics",
+    "Topic :: Scientific/Engineering :: Image Processing",
+]
+keywords = ["image-processing", "film-simulation", "pyo3", "rust", "raspberry-pi"]
+
+[project.urls]
+Homepage = "https://github.com/oberbichler/saturnix-filter"
+Repository = "https://github.com/oberbichler/saturnix-filter"
+Issues = "https://github.com/oberbichler/saturnix-filter/issues"
+
+[dependency-groups]
+dev = [
+    "maturin>=1.5,<2.0",
+    "pytest>=7.0",
+]
