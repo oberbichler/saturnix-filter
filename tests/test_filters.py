@@ -4,7 +4,19 @@ from PIL import Image
 import saturnix_filter
 
 WIDTH, HEIGHT = 32, 24
-FILTERS = ["S-Gold", "S-Vivid", "S-Natural", "S-Saturnix", "S-MonoX", "VHS"]
+FILTERS = [
+    "S-Gold",
+    "S-Vivid",
+    "S-Natural",
+    "S-Saturnix",
+    "S-MonoX",
+    "S-Portra",
+    "S-Cinestill",
+    "S-Cross",
+    "S-Faded",
+    "S-Bleach",
+    "VHS",
+]
 
 
 def make_buffer():
