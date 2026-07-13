@@ -23,6 +23,7 @@ FILTERS = [
     "S-Fuji",
     "S-Selenium",
     "S-Platinum",
+    "S-Infrared",
     "VHS",
 ]
 
@@ -39,6 +40,14 @@ def mid_gray_buffer():
 
 def first_pixel(buf):
     return buf[0], buf[1], buf[2]
+
+
+def solid_green_buffer():
+    # Uniform pure green: every pixel is (0, 200, 0).
+    buf = bytearray(WIDTH * HEIGHT * 3)
+    for i in range(1, len(buf), 3):
+        buf[i] = 200
+    return buf
 
 
 @pytest.mark.parametrize("film_name", FILTERS)
@@ -102,3 +111,11 @@ def test_platinum_tints_neutral_gray_warm():
     saturnix_filter.apply_film_inplace(buf, WIDTH, HEIGHT, "S-Platinum")
     r, g, b = first_pixel(buf)
     assert r > b
+
+
+def test_infrared_turns_green_red():
+    # False-colour infrared renders green foliage as red-dominant (r > g).
+    buf = solid_green_buffer()
+    saturnix_filter.apply_film_inplace(buf, WIDTH, HEIGHT, "S-Infrared")
+    r, g, b = first_pixel(buf)
+    assert r > g

@@ -8,7 +8,7 @@ Developed to accelerate on-device photo processing, `saturnix-filter` delivers a
 
 - Zero-Copy Memory Model: Manipulates Pillow image bytes directly in memory space
 - Parallel Execution: Distributes row-by-row pixel computations across all available CPU cores using `rayon`.
-- 19 Complete Film Styles:
+- 20 Complete Film Styles:
   - `S-Gold` (Kodak Gold warm vintage style)
   - `S-Vivid` (Kodak Ektar ultra-saturated style)
   - `S-Natural` (Fujifilm organic greens style)
@@ -27,6 +27,7 @@ Developed to accelerate on-device photo processing, `saturnix-filter` delivers a
   - `S-Fuji` (Fujifilm Velvia high-saturation landscape style)
   - `S-Selenium` (Cool selenium-toned B&W)
   - `S-Platinum` (Warm, soft platinum-print-toned B&W)
+  - `S-Infrared` (Aerochrome-style false-colour infrared)
   - `VHS` (Vintage VHS tape simulation)
 
 ## Examples
@@ -54,6 +55,7 @@ Each column is one source photo; each row is the same image with a filter applie
 | S-Fuji      | ![](docs/examples/s_01_s-fuji.jpg)    | ![](docs/examples/s_02_s-fuji.jpg)    | ![](docs/examples/s_03_s-fuji.jpg)    | ![](docs/examples/s_04_s-fuji.jpg)    |
 | S-Selenium  | ![](docs/examples/s_01_s-selenium.jpg)| ![](docs/examples/s_02_s-selenium.jpg)| ![](docs/examples/s_03_s-selenium.jpg)| ![](docs/examples/s_04_s-selenium.jpg)|
 | S-Platinum  | ![](docs/examples/s_01_s-platinum.jpg)| ![](docs/examples/s_02_s-platinum.jpg)| ![](docs/examples/s_03_s-platinum.jpg)| ![](docs/examples/s_04_s-platinum.jpg)|
+| S-Infrared  | ![](docs/examples/s_01_s-infrared.jpg)| ![](docs/examples/s_02_s-infrared.jpg)| ![](docs/examples/s_03_s-infrared.jpg)| ![](docs/examples/s_04_s-infrared.jpg)|
 | VHS         | ![](docs/examples/s_01_vhs.jpg)       | ![](docs/examples/s_02_vhs.jpg)       | ![](docs/examples/s_03_vhs.jpg)       | ![](docs/examples/s_04_vhs.jpg)       |
 
 ## Installation
@@ -81,7 +83,7 @@ buf = bytearray(img.tobytes())
 # Supported options: "S-Gold", "S-Vivid", "S-Natural", "S-Saturnix", "S-MonoX",
 #                    "S-Portra", "S-Cinestill", "S-Cross", "S-Faded", "S-Bleach",
 #                    "S-Sepia", "S-Cyano", "S-Noir", "S-Teal", "S-Lomo", "S-Fuji",
-#                    "S-Selenium", "S-Platinum", "VHS"
+#                    "S-Selenium", "S-Platinum", "S-Infrared", "VHS"
 saturnix_filter.apply_film_inplace(buf, width, height, "S-Saturnix")
 
 # 4. Re-construct the Pillow image from the modified buffer

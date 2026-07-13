@@ -24,7 +24,16 @@ struct FilmProfile {
     tint_r: f32,
     tint_g: f32,
     tint_b: f32,
+    // Optional 3x3 RGB channel-mix matrix applied *before* the per-channel
+    // tone LUTs on the colour path (row-major: out_r, out_g, out_b rows).
+    // Enables cross-channel effects such as false-colour infrared. The
+    // identity matrix `IDENTITY_MIX` leaves the image unchanged. Ignored on the
+    // monochrome path.
+    mix: [f32; 9],
 }
+
+// Identity channel-mix matrix (no cross-channel mixing).
+const IDENTITY_MIX: [f32; 9] = [1.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 1.0];
 
 fn get_profile(name: &str) -> Option<FilmProfile> {
     match name {
@@ -46,6 +55,7 @@ fn get_profile(name: &str) -> Option<FilmProfile> {
             tint_r: 1.0,
             tint_g: 1.0,
             tint_b: 1.0,
+            mix: IDENTITY_MIX,
         }),
         "S-Vivid" => Some(FilmProfile {
             color_r: 0.98,
@@ -65,6 +75,7 @@ fn get_profile(name: &str) -> Option<FilmProfile> {
             tint_r: 1.0,
             tint_g: 1.0,
             tint_b: 1.0,
+            mix: IDENTITY_MIX,
         }),
         "S-Natural" => Some(FilmProfile {
             color_r: 0.92,
@@ -84,6 +95,7 @@ fn get_profile(name: &str) -> Option<FilmProfile> {
             tint_r: 1.0,
             tint_g: 1.0,
             tint_b: 1.0,
+            mix: IDENTITY_MIX,
         }),
         "S-Saturnix" => Some(FilmProfile {
             color_r: 1.10,
@@ -103,6 +115,7 @@ fn get_profile(name: &str) -> Option<FilmProfile> {
             tint_r: 1.0,
             tint_g: 1.0,
             tint_b: 1.0,
+            mix: IDENTITY_MIX,
         }),
         "S-MonoX" => Some(FilmProfile {
             color_r: 0.25,
@@ -122,6 +135,7 @@ fn get_profile(name: &str) -> Option<FilmProfile> {
             tint_r: 1.0,
             tint_g: 1.0,
             tint_b: 1.0,
+            mix: IDENTITY_MIX,
         }),
         // Kodak Portra 400: warm, restrained saturation, flat forgiving curve,
         // clean slightly-warm shadows, soft highlight roll-off, fine grain.
@@ -143,6 +157,7 @@ fn get_profile(name: &str) -> Option<FilmProfile> {
             tint_r: 1.0,
             tint_g: 1.0,
             tint_b: 1.0,
+            mix: IDENTITY_MIX,
         }),
         // Cinestill 800T: tungsten stock in daylight -> strong cool cast,
         // teal-leaning shadows, cinematic contrast, noticeable grain.
@@ -165,6 +180,7 @@ fn get_profile(name: &str) -> Option<FilmProfile> {
             tint_r: 1.0,
             tint_g: 1.0,
             tint_b: 1.0,
+            mix: IDENTITY_MIX,
         }),
         // Cross-processing (E-6 in C-41): exaggerated saturation, high contrast,
         // yellow-green highlights and cyan-blue shadows, coarse grain.
@@ -186,6 +202,7 @@ fn get_profile(name: &str) -> Option<FilmProfile> {
             tint_r: 1.0,
             tint_g: 1.0,
             tint_b: 1.0,
+            mix: IDENTITY_MIX,
         }),
         // Faded / aged vintage print: milky lifted blacks, dulled highlights,
         // warm yellow-magenta cast, low saturation, flat compressed range.
@@ -207,6 +224,7 @@ fn get_profile(name: &str) -> Option<FilmProfile> {
             tint_r: 1.0,
             tint_g: 1.0,
             tint_b: 1.0,
+            mix: IDENTITY_MIX,
         }),
         // Bleach bypass (silver retention): heavily desaturated, very high
         // contrast, near-neutral slightly-cool metallic look, gritty grain.
@@ -228,6 +246,7 @@ fn get_profile(name: &str) -> Option<FilmProfile> {
             tint_r: 1.0,
             tint_g: 1.0,
             tint_b: 1.0,
+            mix: IDENTITY_MIX,
         }),
         // Sepia: warm brown-toned B&W. Neutral luminance is tinted towards
         // red/orange and away from blue.
@@ -249,6 +268,7 @@ fn get_profile(name: &str) -> Option<FilmProfile> {
             tint_r: 1.15,
             tint_g: 1.00,
             tint_b: 0.72,
+            mix: IDENTITY_MIX,
         }),
         // Cyanotype: cool blue-toned B&W. Neutral luminance is tinted towards
         // blue and away from red.
@@ -270,6 +290,7 @@ fn get_profile(name: &str) -> Option<FilmProfile> {
             tint_r: 0.62,
             tint_g: 0.90,
             tint_b: 1.25,
+            mix: IDENTITY_MIX,
         }),
         // Noir: high-contrast neutral B&W with a heavy vignette.
         "S-Noir" => Some(FilmProfile {
@@ -290,6 +311,7 @@ fn get_profile(name: &str) -> Option<FilmProfile> {
             tint_r: 1.0,
             tint_g: 1.0,
             tint_b: 1.0,
+            mix: IDENTITY_MIX,
         }),
         // Teal & Orange: cinematic look with warm highlights (orange skin/light)
         // and teal-pushed shadows.
@@ -311,6 +333,7 @@ fn get_profile(name: &str) -> Option<FilmProfile> {
             tint_r: 1.0,
             tint_g: 1.0,
             tint_b: 1.0,
+            mix: IDENTITY_MIX,
         }),
         // Lomo / toy camera: oversaturated, punchy, heavy vignette and grain.
         "S-Lomo" => Some(FilmProfile {
@@ -331,6 +354,7 @@ fn get_profile(name: &str) -> Option<FilmProfile> {
             tint_r: 1.0,
             tint_g: 1.0,
             tint_b: 1.0,
+            mix: IDENTITY_MIX,
         }),
         // Fujifilm Velvia: high-saturation landscape stock with strong greens
         // and blues and a punchy contrast curve.
@@ -352,6 +376,7 @@ fn get_profile(name: &str) -> Option<FilmProfile> {
             tint_r: 1.0,
             tint_g: 1.0,
             tint_b: 1.0,
+            mix: IDENTITY_MIX,
         }),
         // Selenium-toned B&W: cool, slightly purple tone.
         "S-Selenium" => Some(FilmProfile {
@@ -372,6 +397,7 @@ fn get_profile(name: &str) -> Option<FilmProfile> {
             tint_r: 0.94,
             tint_g: 0.96,
             tint_b: 1.10,
+            mix: IDENTITY_MIX,
         }),
         // Platinum / palladium print: warm-neutral, soft low-contrast tone with
         // a long tonal range.
@@ -393,6 +419,36 @@ fn get_profile(name: &str) -> Option<FilmProfile> {
             tint_r: 1.08,
             tint_g: 1.02,
             tint_b: 0.90,
+            mix: IDENTITY_MIX,
+        }),
+        // False-colour infrared (Aerochrome-style): the channel-mix routes the
+        // green (foliage/IR) signal into red so vegetation renders crimson,
+        // shifts red into green, and keeps blue dark. High saturation and
+        // contrast complete the surreal look.
+        "S-Infrared" => Some(FilmProfile {
+            color_r: 1.00,
+            color_g: 1.00,
+            color_b: 1.00,
+            saturation: 1.45,
+            contrast: 1.20,
+            brightness: 1.00,
+            shadow_r: 0,
+            shadow_g: 0,
+            shadow_b: 0,
+            lift_shadows: 0,
+            compress_highlights: -6,
+            grain: 8,
+            vignette: 0.20,
+            is_monochrome: false,
+            tint_r: 1.0,
+            tint_g: 1.0,
+            tint_b: 1.0,
+            #[rustfmt::skip]
+            mix: [
+                0.10, 0.90, 0.10, // out_r <- mostly green (IR foliage -> red)
+                0.85, 0.15, 0.05, // out_g <- mostly red
+                0.05, 0.10, 0.70, // out_b <- attenuated blue
+            ],
         }),
         _ => None,
     }
@@ -458,7 +514,7 @@ impl SimpleRng {
 // Compile-Time specialize loop iterations using Rust Const Generics!
 // This completely removes branch 'if' statements from the inner loops, allowing
 // LLVM's auto-vectorizer to generate highly efficient SIMD (NEON/SSE/AVX) assembly instructions.
-fn process_filter_generic<const MONO: bool, const VIG: bool, const GRAIN: bool>(
+fn process_filter_generic<const MONO: bool, const VIG: bool, const GRAIN: bool, const MIX: bool>(
     slice: &mut [u8],
     width: u32,
     height: u32,
@@ -508,6 +564,16 @@ fn process_filter_generic<const MONO: bool, const VIG: bool, const GRAIN: bool>(
     let tint_g_w = (p.tint_g * 1024.0) as u32;
     let tint_b_w = (p.tint_b * 1024.0) as u32;
 
+    // Channel-mix weights (10-bit Fixed-Point). Only used on the colour path
+    // when MIX is enabled.
+    let mix_w = {
+        let mut w = [0i32; 9];
+        for (dst, &src) in w.iter_mut().zip(p.mix.iter()) {
+            *dst = (src * 1024.0) as i32;
+        }
+        w
+    };
+
     // Vignette factor (scaled by 2^24 to prevent division underflows)
     let vig_scale = if VIG {
         (p.vignette * 16777216.0 / max_dist_sq) as u64
@@ -552,10 +618,28 @@ fn process_filter_generic<const MONO: bool, const VIG: bool, const GRAIN: bool>(
                     g = ((f_lum * tint_g_w) >> 10).min(255);
                     b = ((f_lum * tint_b_w) >> 10).min(255);
                 } else {
+                    let in_r = row[idx] as i32;
+                    let in_g = row[idx + 1] as i32;
+                    let in_b = row[idx + 2] as i32;
+
+                    // 0. Optional channel mix (Fixed-Point). Identity mix is
+                    // compiled out via the MIX const generic.
+                    let (mr, mg, mb) = if MIX {
+                        let mr = ((mix_w[0] * in_r + mix_w[1] * in_g + mix_w[2] * in_b) >> 10)
+                            .clamp(0, 255);
+                        let mg = ((mix_w[3] * in_r + mix_w[4] * in_g + mix_w[5] * in_b) >> 10)
+                            .clamp(0, 255);
+                        let mb = ((mix_w[6] * in_r + mix_w[7] * in_g + mix_w[8] * in_b) >> 10)
+                            .clamp(0, 255);
+                        (mr as usize, mg as usize, mb as usize)
+                    } else {
+                        (in_r as usize, in_g as usize, in_b as usize)
+                    };
+
                     // 1. Point LUT transform
-                    let r_tone = r_lut[row[idx] as usize] as i32;
-                    let g_tone = g_lut[row[idx + 1] as usize] as i32;
-                    let b_tone = b_lut[row[idx + 2] as usize] as i32;
+                    let r_tone = r_lut[mr] as i32;
+                    let g_tone = g_lut[mg] as i32;
+                    let b_tone = b_lut[mb] as i32;
 
                     // 2. Saturation (Fixed-Point)
                     let lum = (306 * r_tone + 601 * g_tone + 117 * b_tone) >> 10;
@@ -603,24 +687,46 @@ fn process_filter(slice: &mut [u8], width: u32, height: u32, p: &FilmProfile) {
     let mono = p.is_monochrome;
     let vig = p.vignette > 0.0;
     let grain = p.grain > 0;
+    // The channel mix only affects the colour path; ignore it for monochrome.
+    let mix = !mono && p.mix != IDENTITY_MIX;
 
-    // Dispatch compile-time specialized loop branches
-    match (mono, vig, grain) {
-        (true, true, true) => process_filter_generic::<true, true, true>(slice, width, height, p),
-        (true, true, false) => process_filter_generic::<true, true, false>(slice, width, height, p),
-        (true, false, true) => process_filter_generic::<true, false, true>(slice, width, height, p),
-        (true, false, false) => {
-            process_filter_generic::<true, false, false>(slice, width, height, p)
+    // Dispatch compile-time specialized loop branches.
+    match (mono, vig, grain, mix) {
+        (true, true, true, _) => {
+            process_filter_generic::<true, true, true, false>(slice, width, height, p)
         }
-        (false, true, true) => process_filter_generic::<false, true, true>(slice, width, height, p),
-        (false, true, false) => {
-            process_filter_generic::<false, true, false>(slice, width, height, p)
+        (true, true, false, _) => {
+            process_filter_generic::<true, true, false, false>(slice, width, height, p)
         }
-        (false, false, true) => {
-            process_filter_generic::<false, false, true>(slice, width, height, p)
+        (true, false, true, _) => {
+            process_filter_generic::<true, false, true, false>(slice, width, height, p)
         }
-        (false, false, false) => {
-            process_filter_generic::<false, false, false>(slice, width, height, p)
+        (true, false, false, _) => {
+            process_filter_generic::<true, false, false, false>(slice, width, height, p)
+        }
+        (false, true, true, false) => {
+            process_filter_generic::<false, true, true, false>(slice, width, height, p)
+        }
+        (false, true, true, true) => {
+            process_filter_generic::<false, true, true, true>(slice, width, height, p)
+        }
+        (false, true, false, false) => {
+            process_filter_generic::<false, true, false, false>(slice, width, height, p)
+        }
+        (false, true, false, true) => {
+            process_filter_generic::<false, true, false, true>(slice, width, height, p)
+        }
+        (false, false, true, false) => {
+            process_filter_generic::<false, false, true, false>(slice, width, height, p)
+        }
+        (false, false, true, true) => {
+            process_filter_generic::<false, false, true, true>(slice, width, height, p)
+        }
+        (false, false, false, false) => {
+            process_filter_generic::<false, false, false, false>(slice, width, height, p)
+        }
+        (false, false, false, true) => {
+            process_filter_generic::<false, false, false, true>(slice, width, height, p)
         }
     }
 }
