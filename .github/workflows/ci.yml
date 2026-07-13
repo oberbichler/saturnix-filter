@@ -60,4 +60,4 @@ jobs:
       - name: Build and test
         run: |
           uv run maturin develop
-          uv run pytest
+          uv run --no-sync pytest
