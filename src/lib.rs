@@ -13,6 +13,13 @@ struct FilmProfile {
     shadow_r: i32,
     shadow_g: i32,
     shadow_b: i32,
+    // Split-toning highlight tint (additive, per channel). Applied by the tone
+    // LUT weighted towards the highlights (v/255), the counterpart to the
+    // shadow_* tint which is weighted towards the shadows. 0/0/0 == no highlight
+    // tint. Ignored on the monochrome path.
+    highlight_r: i32,
+    highlight_g: i32,
+    highlight_b: i32,
     lift_shadows: i32,
     compress_highlights: i32,
     grain: i32,
@@ -30,6 +37,11 @@ struct FilmProfile {
     // identity matrix `IDENTITY_MIX` leaves the image unchanged. Ignored on the
     // monochrome path.
     mix: [f32; 9],
+    // S-curve strength baked into the tone LUTs (0.0 == linear, no effect).
+    // Positive values add a filmic toe/shoulder: mid-tone contrast rises while
+    // pure black and white are preserved. Applies on both the colour and the
+    // monochrome path (via the shared tone LUT).
+    curve: f32,
 }
 
 // Identity channel-mix matrix (no cross-channel mixing).
@@ -47,6 +59,9 @@ fn get_profile(name: &str) -> Option<FilmProfile> {
             shadow_r: 30,
             shadow_g: 20,
             shadow_b: 5,
+            highlight_r: 0,
+            highlight_g: 0,
+            highlight_b: 0,
             lift_shadows: 18,
             compress_highlights: -12,
             grain: 14,
@@ -56,6 +71,7 @@ fn get_profile(name: &str) -> Option<FilmProfile> {
             tint_g: 1.0,
             tint_b: 1.0,
             mix: IDENTITY_MIX,
+            curve: 0.0,
         }),
         // Kodak Ektar: ultra-saturated. A slightly "unmixing" matrix pulls each
         // channel away from its neighbours to widen colour separation (Ektar's
@@ -71,6 +87,9 @@ fn get_profile(name: &str) -> Option<FilmProfile> {
             shadow_r: 0,
             shadow_g: 0,
             shadow_b: 0,
+            highlight_r: 0,
+            highlight_g: 0,
+            highlight_b: 0,
             lift_shadows: 0,
             compress_highlights: 0,
             grain: 2,
@@ -85,6 +104,7 @@ fn get_profile(name: &str) -> Option<FilmProfile> {
                 -0.06, 1.12, -0.06, // out_g <- green, minus red/blue
                 -0.05, -0.07, 1.12, // out_b <- blue, minus red/green
             ],
+            curve: 0.0,
         }),
         "S-Natural" => Some(FilmProfile {
             color_r: 0.92,
@@ -96,6 +116,9 @@ fn get_profile(name: &str) -> Option<FilmProfile> {
             shadow_r: 5,
             shadow_g: 18,
             shadow_b: 14,
+            highlight_r: 0,
+            highlight_g: 0,
+            highlight_b: 0,
             lift_shadows: 12,
             compress_highlights: -8,
             grain: 10,
@@ -105,6 +128,7 @@ fn get_profile(name: &str) -> Option<FilmProfile> {
             tint_g: 1.0,
             tint_b: 1.0,
             mix: IDENTITY_MIX,
+            curve: 0.0,
         }),
         "S-Saturnix" => Some(FilmProfile {
             color_r: 1.10,
@@ -116,6 +140,9 @@ fn get_profile(name: &str) -> Option<FilmProfile> {
             shadow_r: 12,
             shadow_g: 6,
             shadow_b: 40,
+            highlight_r: 0,
+            highlight_g: 0,
+            highlight_b: 0,
             lift_shadows: 20,
             compress_highlights: -6,
             grain: 6,
@@ -125,6 +152,7 @@ fn get_profile(name: &str) -> Option<FilmProfile> {
             tint_g: 1.0,
             tint_b: 1.0,
             mix: IDENTITY_MIX,
+            curve: 0.0,
         }),
         "S-MonoX" => Some(FilmProfile {
             color_r: 0.25,
@@ -136,6 +164,9 @@ fn get_profile(name: &str) -> Option<FilmProfile> {
             shadow_r: 0,
             shadow_g: 0,
             shadow_b: 0,
+            highlight_r: 0,
+            highlight_g: 0,
+            highlight_b: 0,
             lift_shadows: 0,
             compress_highlights: 0,
             grain: 16,
@@ -145,6 +176,7 @@ fn get_profile(name: &str) -> Option<FilmProfile> {
             tint_g: 1.0,
             tint_b: 1.0,
             mix: IDENTITY_MIX,
+            curve: 0.0,
         }),
         // Kodak Portra 400: warm, restrained saturation, flat forgiving curve,
         // clean slightly-warm shadows, soft highlight roll-off, fine grain.
@@ -158,6 +190,9 @@ fn get_profile(name: &str) -> Option<FilmProfile> {
             shadow_r: 8,
             shadow_g: 4,
             shadow_b: 0,
+            highlight_r: 0,
+            highlight_g: 0,
+            highlight_b: 0,
             lift_shadows: 10,
             compress_highlights: -10,
             grain: 8,
@@ -167,6 +202,7 @@ fn get_profile(name: &str) -> Option<FilmProfile> {
             tint_g: 1.0,
             tint_b: 1.0,
             mix: IDENTITY_MIX,
+            curve: 0.0,
         }),
         // Cinestill 800T: tungsten stock in daylight -> strong cool cast,
         // teal-leaning shadows, cinematic contrast, noticeable grain.
@@ -181,6 +217,9 @@ fn get_profile(name: &str) -> Option<FilmProfile> {
             shadow_r: 0,
             shadow_g: 10,
             shadow_b: 24,
+            highlight_r: 0,
+            highlight_g: 0,
+            highlight_b: 0,
             lift_shadows: 6,
             compress_highlights: -4,
             grain: 12,
@@ -198,6 +237,7 @@ fn get_profile(name: &str) -> Option<FilmProfile> {
                 0.00, 0.97, 0.03, // out_g <- green, faint blue
                 0.05, 0.08, 0.90, // out_b <- blue + green/red bleed (teal)
             ],
+            curve: 0.0,
         }),
         // Cross-processing (E-6 in C-41): exaggerated saturation, high contrast,
         // yellow-green highlights and cyan-blue shadows, coarse grain.
@@ -215,6 +255,9 @@ fn get_profile(name: &str) -> Option<FilmProfile> {
             shadow_r: 0,
             shadow_g: 10,
             shadow_b: 30,
+            highlight_r: 0,
+            highlight_g: 0,
+            highlight_b: 0,
             lift_shadows: 0,
             compress_highlights: 0,
             grain: 12,
@@ -229,6 +272,7 @@ fn get_profile(name: &str) -> Option<FilmProfile> {
                 0.00, 0.94, 0.10,  // out_g <- green + a little blue (cyan cast)
                 0.06, 0.00, 0.98,  // out_b <- blue + a touch of red
             ],
+            curve: 0.0,
         }),
         // Faded / aged vintage print: milky lifted blacks, dulled highlights,
         // warm yellow-magenta cast, low saturation, flat compressed range.
@@ -242,6 +286,9 @@ fn get_profile(name: &str) -> Option<FilmProfile> {
             shadow_r: 20,
             shadow_g: 14,
             shadow_b: 6,
+            highlight_r: 0,
+            highlight_g: 0,
+            highlight_b: 0,
             lift_shadows: 35,
             compress_highlights: -15,
             grain: 10,
@@ -251,6 +298,7 @@ fn get_profile(name: &str) -> Option<FilmProfile> {
             tint_g: 1.0,
             tint_b: 1.0,
             mix: IDENTITY_MIX,
+            curve: 0.0,
         }),
         // Bleach bypass (silver retention): heavily desaturated, very high
         // contrast, near-neutral slightly-cool metallic look, gritty grain.
@@ -264,6 +312,9 @@ fn get_profile(name: &str) -> Option<FilmProfile> {
             shadow_r: 0,
             shadow_g: 0,
             shadow_b: 4,
+            highlight_r: 0,
+            highlight_g: 0,
+            highlight_b: 0,
             lift_shadows: 0,
             compress_highlights: 0,
             grain: 14,
@@ -273,6 +324,7 @@ fn get_profile(name: &str) -> Option<FilmProfile> {
             tint_g: 1.0,
             tint_b: 1.0,
             mix: IDENTITY_MIX,
+            curve: 0.0,
         }),
         // Sepia: warm brown-toned B&W. Neutral luminance is tinted towards
         // red/orange and away from blue.
@@ -286,6 +338,9 @@ fn get_profile(name: &str) -> Option<FilmProfile> {
             shadow_r: 0,
             shadow_g: 0,
             shadow_b: 0,
+            highlight_r: 0,
+            highlight_g: 0,
+            highlight_b: 0,
             lift_shadows: 8,
             compress_highlights: -6,
             grain: 12,
@@ -295,6 +350,7 @@ fn get_profile(name: &str) -> Option<FilmProfile> {
             tint_g: 1.00,
             tint_b: 0.72,
             mix: IDENTITY_MIX,
+            curve: 0.0,
         }),
         // Cyanotype: cool blue-toned B&W. Neutral luminance is tinted towards
         // blue and away from red.
@@ -308,6 +364,9 @@ fn get_profile(name: &str) -> Option<FilmProfile> {
             shadow_r: 0,
             shadow_g: 0,
             shadow_b: 0,
+            highlight_r: 0,
+            highlight_g: 0,
+            highlight_b: 0,
             lift_shadows: 6,
             compress_highlights: 0,
             grain: 8,
@@ -317,6 +376,7 @@ fn get_profile(name: &str) -> Option<FilmProfile> {
             tint_g: 0.90,
             tint_b: 1.25,
             mix: IDENTITY_MIX,
+            curve: 0.0,
         }),
         // Noir: high-contrast neutral B&W with a heavy vignette.
         "S-Noir" => Some(FilmProfile {
@@ -329,6 +389,9 @@ fn get_profile(name: &str) -> Option<FilmProfile> {
             shadow_r: 0,
             shadow_g: 0,
             shadow_b: 0,
+            highlight_r: 0,
+            highlight_g: 0,
+            highlight_b: 0,
             lift_shadows: 0,
             compress_highlights: 0,
             grain: 10,
@@ -338,6 +401,7 @@ fn get_profile(name: &str) -> Option<FilmProfile> {
             tint_g: 1.0,
             tint_b: 1.0,
             mix: IDENTITY_MIX,
+            curve: 0.0,
         }),
         // Teal & Orange: cinematic look with warm highlights (orange skin/light)
         // and teal-pushed shadows.
@@ -351,6 +415,9 @@ fn get_profile(name: &str) -> Option<FilmProfile> {
             shadow_r: 0,
             shadow_g: 14,
             shadow_b: 26,
+            highlight_r: 0,
+            highlight_g: 0,
+            highlight_b: 0,
             lift_shadows: 6,
             compress_highlights: -4,
             grain: 6,
@@ -360,6 +427,7 @@ fn get_profile(name: &str) -> Option<FilmProfile> {
             tint_g: 1.0,
             tint_b: 1.0,
             mix: IDENTITY_MIX,
+            curve: 0.0,
         }),
         // Lomo / toy camera: oversaturated, punchy, heavy vignette and grain.
         "S-Lomo" => Some(FilmProfile {
@@ -372,6 +440,9 @@ fn get_profile(name: &str) -> Option<FilmProfile> {
             shadow_r: 6,
             shadow_g: 4,
             shadow_b: 18,
+            highlight_r: 0,
+            highlight_g: 0,
+            highlight_b: 0,
             lift_shadows: 4,
             compress_highlights: -6,
             grain: 16,
@@ -381,6 +452,7 @@ fn get_profile(name: &str) -> Option<FilmProfile> {
             tint_g: 1.0,
             tint_b: 1.0,
             mix: IDENTITY_MIX,
+            curve: 0.0,
         }),
         // Fujifilm Velvia: high-saturation landscape stock with strong greens
         // and blues and a punchy contrast curve. The mix separates green from
@@ -396,6 +468,9 @@ fn get_profile(name: &str) -> Option<FilmProfile> {
             shadow_r: 0,
             shadow_g: 8,
             shadow_b: 6,
+            highlight_r: 0,
+            highlight_g: 0,
+            highlight_b: 0,
             lift_shadows: 0,
             compress_highlights: -6,
             grain: 4,
@@ -410,6 +485,7 @@ fn get_profile(name: &str) -> Option<FilmProfile> {
                 -0.02, 1.10, -0.08, // out_g <- green, minus blue (warmer greens)
                 -0.02, -0.06, 1.08, // out_b <- blue, minus green (deeper skies)
             ],
+            curve: 0.0,
         }),
         // Selenium-toned B&W: cool, slightly purple tone.
         "S-Selenium" => Some(FilmProfile {
@@ -422,6 +498,9 @@ fn get_profile(name: &str) -> Option<FilmProfile> {
             shadow_r: 0,
             shadow_g: 0,
             shadow_b: 0,
+            highlight_r: 0,
+            highlight_g: 0,
+            highlight_b: 0,
             lift_shadows: 0,
             compress_highlights: 0,
             grain: 8,
@@ -431,6 +510,7 @@ fn get_profile(name: &str) -> Option<FilmProfile> {
             tint_g: 0.96,
             tint_b: 1.10,
             mix: IDENTITY_MIX,
+            curve: 0.0,
         }),
         // Platinum / palladium print: warm-neutral, soft low-contrast tone with
         // a long tonal range.
@@ -444,6 +524,9 @@ fn get_profile(name: &str) -> Option<FilmProfile> {
             shadow_r: 0,
             shadow_g: 0,
             shadow_b: 0,
+            highlight_r: 0,
+            highlight_g: 0,
+            highlight_b: 0,
             lift_shadows: 14,
             compress_highlights: -8,
             grain: 6,
@@ -453,6 +536,7 @@ fn get_profile(name: &str) -> Option<FilmProfile> {
             tint_g: 1.02,
             tint_b: 0.90,
             mix: IDENTITY_MIX,
+            curve: 0.0,
         }),
         // False-colour infrared (Aerochrome-style): the channel-mix routes the
         // green (foliage/IR) signal into red so vegetation renders crimson,
@@ -468,6 +552,9 @@ fn get_profile(name: &str) -> Option<FilmProfile> {
             shadow_r: 0,
             shadow_g: 0,
             shadow_b: 0,
+            highlight_r: 0,
+            highlight_g: 0,
+            highlight_b: 0,
             lift_shadows: 0,
             compress_highlights: -6,
             grain: 8,
@@ -482,19 +569,174 @@ fn get_profile(name: &str) -> Option<FilmProfile> {
                 0.85, 0.15, 0.05, // out_g <- mostly red
                 0.05, 0.10, 0.70, // out_b <- attenuated blue
             ],
+            curve: 0.0,
+        }),
+        // Split-toning: independent tints for highlights and shadows. Warm
+        // (orange) highlights and cool (teal/blue) shadows - the classic
+        // cinematic split-tone grade.
+        "S-SplitTone" => Some(FilmProfile {
+            color_r: 1.00,
+            color_g: 1.00,
+            color_b: 1.00,
+            saturation: 1.10,
+            contrast: 1.12,
+            brightness: 1.00,
+            shadow_r: -14,
+            shadow_g: 4,
+            shadow_b: 24,
+            highlight_r: 22,
+            highlight_g: 8,
+            highlight_b: -18,
+            lift_shadows: 0,
+            compress_highlights: 0,
+            grain: 6,
+            vignette: 0.18,
+            is_monochrome: false,
+            tint_r: 1.0,
+            tint_g: 1.0,
+            tint_b: 1.0,
+            mix: IDENTITY_MIX,
+            curve: 0.0,
+        }),
+        // Kodachrome: rich, warm reds, deep blues, punchy contrast. A mild mix
+        // cleans the primaries; warm highlights and slightly cool shadows give
+        // the signature vintage-slide look.
+        "S-Kodachrome" => Some(FilmProfile {
+            color_r: 1.08,
+            color_g: 0.98,
+            color_b: 0.96,
+            saturation: 1.35,
+            contrast: 1.22,
+            brightness: 1.00,
+            shadow_r: 0,
+            shadow_g: 0,
+            shadow_b: 12,
+            highlight_r: 14,
+            highlight_g: 6,
+            highlight_b: -8,
+            lift_shadows: 0,
+            compress_highlights: -6,
+            grain: 8,
+            vignette: 0.22,
+            is_monochrome: false,
+            tint_r: 1.0,
+            tint_g: 1.0,
+            tint_b: 1.0,
+            #[rustfmt::skip]
+            mix: [
+                1.08, -0.04, -0.04, // out_r <- clean red
+                -0.03, 1.05, -0.02, // out_g
+                -0.02, -0.04, 1.06, // out_b <- deeper blue
+            ],
+            curve: 0.0,
+        }),
+        // Polaroid / instant film: milky lifted blacks, soft contrast, a cyan
+        // cast and a heavy vignette.
+        "S-Polaroid" => Some(FilmProfile {
+            color_r: 0.96,
+            color_g: 1.02,
+            color_b: 1.04,
+            saturation: 1.05,
+            contrast: 0.88,
+            brightness: 1.03,
+            shadow_r: 0,
+            shadow_g: 14,
+            shadow_b: 20,
+            highlight_r: 12,
+            highlight_g: 6,
+            highlight_b: 0,
+            lift_shadows: 40,
+            compress_highlights: -12,
+            grain: 10,
+            vignette: 0.45,
+            is_monochrome: false,
+            tint_r: 1.0,
+            tint_g: 1.0,
+            tint_b: 1.0,
+            mix: IDENTITY_MIX,
+            curve: 0.0,
+        }),
+        // The Matrix / digital-dystopia: dominant green cast driven by the
+        // channel mix and green highlights.
+        "S-Matrix" => Some(FilmProfile {
+            color_r: 0.90,
+            color_g: 1.10,
+            color_b: 0.92,
+            saturation: 1.10,
+            contrast: 1.20,
+            brightness: 1.00,
+            shadow_r: 0,
+            shadow_g: 12,
+            shadow_b: 0,
+            highlight_r: 0,
+            highlight_g: 16,
+            highlight_b: -6,
+            lift_shadows: 4,
+            compress_highlights: -4,
+            grain: 8,
+            vignette: 0.28,
+            is_monochrome: false,
+            tint_r: 1.0,
+            tint_g: 1.0,
+            tint_b: 1.0,
+            #[rustfmt::skip]
+            mix: [
+                0.85, 0.15, 0.00, // out_r <- some green
+                0.10, 0.95, 0.10, // out_g <- boosted with red/blue bleed
+                0.00, 0.18, 0.82, // out_b <- some green
+            ],
+            curve: 0.0,
+        }),
+        // Cinematic tone curve: a pronounced filmic S-curve gives a rich toe and
+        // shoulder (deep-but-detailed shadows, gentle highlight roll-off) with a
+        // mild teal/orange split-tone for a modern digital-cinema grade.
+        "S-Cine" => Some(FilmProfile {
+            color_r: 1.00,
+            color_g: 1.00,
+            color_b: 1.00,
+            saturation: 1.08,
+            contrast: 1.00,
+            brightness: 1.00,
+            shadow_r: -8,
+            shadow_g: 2,
+            shadow_b: 12,
+            highlight_r: 10,
+            highlight_g: 4,
+            highlight_b: -8,
+            lift_shadows: 0,
+            compress_highlights: 0,
+            grain: 6,
+            vignette: 0.18,
+            is_monochrome: false,
+            tint_r: 1.0,
+            tint_g: 1.0,
+            tint_b: 1.0,
+            mix: IDENTITY_MIX,
+            curve: 0.55,
         }),
         _ => None,
     }
 }
 
-fn make_lut(cm: f32, lift: f32, comp: f32, sh: f32) -> [u8; 256] {
+fn make_lut(cm: f32, lift: f32, comp: f32, sh: f32, hi: f32, curve: f32) -> [u8; 256] {
     let mut lut = [0u8; 256];
     for (i, slot) in lut.iter_mut().enumerate() {
         let mut v = (i as f32 * cm).min(255.0);
         let frac = v / 255.0;
         v = v + lift * (1.0 - frac) + comp * frac;
         v = v.clamp(0.0, 255.0);
-        v = (v + sh * (1.0 - v / 255.0)).min(255.0);
+
+        // Filmic S-curve (0.0 == linear). smootherstep preserves the 0/255
+        // endpoints while adding a toe/shoulder and raising mid-tone contrast.
+        if curve != 0.0 {
+            let x = (v / 255.0).clamp(0.0, 1.0);
+            let s = x * x * x * (x * (x * 6.0 - 15.0) + 10.0);
+            v = (v + curve * (s * 255.0 - v)).clamp(0.0, 255.0);
+        }
+
+        let vf = v / 255.0;
+        // Shadow tint weighted towards shadows, highlight tint towards highlights.
+        v = (v + sh * (1.0 - vf) + hi * vf).clamp(0.0, 255.0);
         *slot = v as u8;
     }
     lut
@@ -559,18 +801,24 @@ fn process_filter_generic<const MONO: bool, const VIG: bool, const GRAIN: bool, 
         p.lift_shadows as f32,
         p.compress_highlights as f32,
         p.shadow_r as f32,
+        p.highlight_r as f32,
+        p.curve,
     );
     let g_lut = make_lut(
         p.color_g,
         p.lift_shadows as f32,
         p.compress_highlights as f32,
         p.shadow_g as f32,
+        p.highlight_g as f32,
+        p.curve,
     );
     let b_lut = make_lut(
         p.color_b,
         p.lift_shadows as f32,
         p.compress_highlights as f32,
         p.shadow_b as f32,
+        p.highlight_b as f32,
+        p.curve,
     );
 
     let mean = 128.0;

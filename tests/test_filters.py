@@ -24,6 +24,11 @@ FILTERS = [
     "S-Selenium",
     "S-Platinum",
     "S-Infrared",
+    "S-SplitTone",
+    "S-Kodachrome",
+    "S-Polaroid",
+    "S-Matrix",
+    "S-Cine",
     "VHS",
 ]
 
@@ -48,6 +53,11 @@ def solid_green_buffer():
     for i in range(1, len(buf), 3):
         buf[i] = 200
     return buf
+
+
+def solid_gray_buffer(value):
+    # Uniform neutral gray at the given level.
+    return bytearray([value] * (WIDTH * HEIGHT * 3))
 
 
 @pytest.mark.parametrize("film_name", FILTERS)
@@ -119,3 +129,42 @@ def test_infrared_turns_green_red():
     saturnix_filter.apply_film_inplace(buf, WIDTH, HEIGHT, "S-Infrared")
     r, g, b = first_pixel(buf)
     assert r > g
+
+
+def test_splittone_warms_highlights_cools_shadows():
+    # Split-toning tints highlights and shadows independently:
+    # a bright gray leans warm (r > b), a dark gray leans cool (b > r).
+    hi = solid_gray_buffer(220)
+    saturnix_filter.apply_film_inplace(hi, WIDTH, HEIGHT, "S-SplitTone")
+    hr, hg, hb = first_pixel(hi)
+
+    lo = solid_gray_buffer(40)
+    saturnix_filter.apply_film_inplace(lo, WIDTH, HEIGHT, "S-SplitTone")
+    lr, lg, lb = first_pixel(lo)
+
+    assert hr > hb  # warm highlights
+    assert lb > lr  # cool shadows
+
+
+def test_matrix_casts_green():
+    # The Matrix look pushes a neutral gray towards green.
+    buf = mid_gray_buffer()
+    saturnix_filter.apply_film_inplace(buf, WIDTH, HEIGHT, "S-Matrix")
+    r, g, b = first_pixel(buf)
+    assert g > r
+    assert g > b
+
+
+def test_cine_scurve_increases_contrast():
+    # A positive S-curve pushes dark tones darker and bright tones brighter
+    # (higher mid-tone contrast) while preserving the endpoints.
+    dark = solid_gray_buffer(64)
+    saturnix_filter.apply_film_inplace(dark, WIDTH, HEIGHT, "S-Cine")
+    dr, _, _ = first_pixel(dark)
+
+    bright = solid_gray_buffer(192)
+    saturnix_filter.apply_film_inplace(bright, WIDTH, HEIGHT, "S-Cine")
+    br, _, _ = first_pixel(bright)
+
+    assert dr < 64  # shadows pushed down
+    assert br > 192  # highlights pushed up
