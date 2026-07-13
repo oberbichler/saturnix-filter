@@ -57,6 +57,10 @@ fn get_profile(name: &str) -> Option<FilmProfile> {
             tint_b: 1.0,
             mix: IDENTITY_MIX,
         }),
+        // Kodak Ektar: ultra-saturated. A slightly "unmixing" matrix pulls each
+        // channel away from its neighbours to widen colour separation (Ektar's
+        // signature clean, differentiated primaries) while keeping neutral grays
+        // neutral (rows sum to ~1.0).
         "S-Vivid" => Some(FilmProfile {
             color_r: 0.98,
             color_g: 1.00,
@@ -75,7 +79,12 @@ fn get_profile(name: &str) -> Option<FilmProfile> {
             tint_r: 1.0,
             tint_g: 1.0,
             tint_b: 1.0,
-            mix: IDENTITY_MIX,
+            #[rustfmt::skip]
+            mix: [
+                1.12, -0.07, -0.05, // out_r <- red, minus green/blue
+                -0.06, 1.12, -0.06, // out_g <- green, minus red/blue
+                -0.05, -0.07, 1.12, // out_b <- blue, minus red/green
+            ],
         }),
         "S-Natural" => Some(FilmProfile {
             color_r: 0.92,
@@ -180,7 +189,15 @@ fn get_profile(name: &str) -> Option<FilmProfile> {
             tint_r: 1.0,
             tint_g: 1.0,
             tint_b: 1.0,
-            mix: IDENTITY_MIX,
+            // A subtle mix bleeds green into blue (teal shadows) and a little
+            // red into blue (cool magenta highlights) for a more authentic
+            // tungsten/neon crossover than a per-channel curve alone.
+            #[rustfmt::skip]
+            mix: [
+                0.98, 0.00, 0.02, // out_r <- red, faint blue
+                0.00, 0.97, 0.03, // out_g <- green, faint blue
+                0.05, 0.08, 0.90, // out_b <- blue + green/red bleed (teal)
+            ],
         }),
         // Cross-processing (E-6 in C-41): exaggerated saturation, high contrast,
         // yellow-green highlights and cyan-blue shadows, coarse grain.
@@ -366,7 +383,9 @@ fn get_profile(name: &str) -> Option<FilmProfile> {
             mix: IDENTITY_MIX,
         }),
         // Fujifilm Velvia: high-saturation landscape stock with strong greens
-        // and blues and a punchy contrast curve.
+        // and blues and a punchy contrast curve. The mix separates green from
+        // blue (richer, deeper foliage and skies - Velvia's signature) while
+        // keeping neutrals neutral.
         "S-Fuji" => Some(FilmProfile {
             color_r: 0.98,
             color_g: 1.04,
@@ -385,7 +404,12 @@ fn get_profile(name: &str) -> Option<FilmProfile> {
             tint_r: 1.0,
             tint_g: 1.0,
             tint_b: 1.0,
-            mix: IDENTITY_MIX,
+            #[rustfmt::skip]
+            mix: [
+                1.06, -0.03, -0.03, // out_r <- red, lightly cleaned
+                -0.02, 1.10, -0.08, // out_g <- green, minus blue (warmer greens)
+                -0.02, -0.06, 1.08, // out_b <- blue, minus green (deeper skies)
+            ],
         }),
         // Selenium-toned B&W: cool, slightly purple tone.
         "S-Selenium" => Some(FilmProfile {
