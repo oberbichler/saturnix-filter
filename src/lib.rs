@@ -184,6 +184,10 @@ fn get_profile(name: &str) -> Option<FilmProfile> {
         }),
         // Cross-processing (E-6 in C-41): exaggerated saturation, high contrast,
         // yellow-green highlights and cyan-blue shadows, coarse grain.
+        // A mild channel-mix reproduces the signature cross-channel dye
+        // contamination that a per-channel curve alone cannot: green bleeds
+        // into red (warm/yellow highlights) and blue bleeds into green
+        // (cyan cast), while red is slightly pulled out of blue.
         "S-Cross" => Some(FilmProfile {
             color_r: 1.10,
             color_g: 1.05,
@@ -202,7 +206,12 @@ fn get_profile(name: &str) -> Option<FilmProfile> {
             tint_r: 1.0,
             tint_g: 1.0,
             tint_b: 1.0,
-            mix: IDENTITY_MIX,
+            #[rustfmt::skip]
+            mix: [
+                0.92, 0.14, -0.06, // out_r <- red + a little green (yellow highlights)
+                0.00, 0.94, 0.10,  // out_g <- green + a little blue (cyan cast)
+                0.06, 0.00, 0.98,  // out_b <- blue + a touch of red
+            ],
         }),
         // Faded / aged vintage print: milky lifted blacks, dulled highlights,
         // warm yellow-magenta cast, low saturation, flat compressed range.
