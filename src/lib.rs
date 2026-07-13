@@ -18,6 +18,12 @@ struct FilmProfile {
     grain: i32,
     vignette: f32,
     is_monochrome: bool,
+    // Monochrome tint multipliers (around 1.0). Applied to the neutral
+    // luminance in the monochrome path to produce toned B&W (sepia, cyanotype,
+    // ...). Ignored on the colour path. 1.0/1.0/1.0 == neutral (no tint).
+    tint_r: f32,
+    tint_g: f32,
+    tint_b: f32,
 }
 
 fn get_profile(name: &str) -> Option<FilmProfile> {
@@ -37,6 +43,9 @@ fn get_profile(name: &str) -> Option<FilmProfile> {
             grain: 14,
             vignette: 0.45,
             is_monochrome: false,
+            tint_r: 1.0,
+            tint_g: 1.0,
+            tint_b: 1.0,
         }),
         "S-Vivid" => Some(FilmProfile {
             color_r: 0.98,
@@ -53,6 +62,9 @@ fn get_profile(name: &str) -> Option<FilmProfile> {
             grain: 2,
             vignette: 0.05,
             is_monochrome: false,
+            tint_r: 1.0,
+            tint_g: 1.0,
+            tint_b: 1.0,
         }),
         "S-Natural" => Some(FilmProfile {
             color_r: 0.92,
@@ -69,6 +81,9 @@ fn get_profile(name: &str) -> Option<FilmProfile> {
             grain: 10,
             vignette: 0.40,
             is_monochrome: false,
+            tint_r: 1.0,
+            tint_g: 1.0,
+            tint_b: 1.0,
         }),
         "S-Saturnix" => Some(FilmProfile {
             color_r: 1.10,
@@ -85,6 +100,9 @@ fn get_profile(name: &str) -> Option<FilmProfile> {
             grain: 6,
             vignette: 0.18,
             is_monochrome: false,
+            tint_r: 1.0,
+            tint_g: 1.0,
+            tint_b: 1.0,
         }),
         "S-MonoX" => Some(FilmProfile {
             color_r: 0.25,
@@ -101,6 +119,9 @@ fn get_profile(name: &str) -> Option<FilmProfile> {
             grain: 16,
             vignette: 0.30,
             is_monochrome: true,
+            tint_r: 1.0,
+            tint_g: 1.0,
+            tint_b: 1.0,
         }),
         // Kodak Portra 400: warm, restrained saturation, flat forgiving curve,
         // clean slightly-warm shadows, soft highlight roll-off, fine grain.
@@ -119,6 +140,9 @@ fn get_profile(name: &str) -> Option<FilmProfile> {
             grain: 8,
             vignette: 0.15,
             is_monochrome: false,
+            tint_r: 1.0,
+            tint_g: 1.0,
+            tint_b: 1.0,
         }),
         // Cinestill 800T: tungsten stock in daylight -> strong cool cast,
         // teal-leaning shadows, cinematic contrast, noticeable grain.
@@ -138,6 +162,9 @@ fn get_profile(name: &str) -> Option<FilmProfile> {
             grain: 12,
             vignette: 0.25,
             is_monochrome: false,
+            tint_r: 1.0,
+            tint_g: 1.0,
+            tint_b: 1.0,
         }),
         // Cross-processing (E-6 in C-41): exaggerated saturation, high contrast,
         // yellow-green highlights and cyan-blue shadows, coarse grain.
@@ -156,6 +183,9 @@ fn get_profile(name: &str) -> Option<FilmProfile> {
             grain: 12,
             vignette: 0.20,
             is_monochrome: false,
+            tint_r: 1.0,
+            tint_g: 1.0,
+            tint_b: 1.0,
         }),
         // Faded / aged vintage print: milky lifted blacks, dulled highlights,
         // warm yellow-magenta cast, low saturation, flat compressed range.
@@ -174,6 +204,9 @@ fn get_profile(name: &str) -> Option<FilmProfile> {
             grain: 10,
             vignette: 0.30,
             is_monochrome: false,
+            tint_r: 1.0,
+            tint_g: 1.0,
+            tint_b: 1.0,
         }),
         // Bleach bypass (silver retention): heavily desaturated, very high
         // contrast, near-neutral slightly-cool metallic look, gritty grain.
@@ -192,6 +225,174 @@ fn get_profile(name: &str) -> Option<FilmProfile> {
             grain: 14,
             vignette: 0.20,
             is_monochrome: false,
+            tint_r: 1.0,
+            tint_g: 1.0,
+            tint_b: 1.0,
+        }),
+        // Sepia: warm brown-toned B&W. Neutral luminance is tinted towards
+        // red/orange and away from blue.
+        "S-Sepia" => Some(FilmProfile {
+            color_r: 0.30,
+            color_g: 0.59,
+            color_b: 0.11,
+            saturation: 0.0,
+            contrast: 1.10,
+            brightness: 1.02,
+            shadow_r: 0,
+            shadow_g: 0,
+            shadow_b: 0,
+            lift_shadows: 8,
+            compress_highlights: -6,
+            grain: 12,
+            vignette: 0.30,
+            is_monochrome: true,
+            tint_r: 1.15,
+            tint_g: 1.00,
+            tint_b: 0.72,
+        }),
+        // Cyanotype: cool blue-toned B&W. Neutral luminance is tinted towards
+        // blue and away from red.
+        "S-Cyano" => Some(FilmProfile {
+            color_r: 0.30,
+            color_g: 0.59,
+            color_b: 0.11,
+            saturation: 0.0,
+            contrast: 1.15,
+            brightness: 1.00,
+            shadow_r: 0,
+            shadow_g: 0,
+            shadow_b: 0,
+            lift_shadows: 6,
+            compress_highlights: 0,
+            grain: 8,
+            vignette: 0.25,
+            is_monochrome: true,
+            tint_r: 0.62,
+            tint_g: 0.90,
+            tint_b: 1.25,
+        }),
+        // Noir: high-contrast neutral B&W with a heavy vignette.
+        "S-Noir" => Some(FilmProfile {
+            color_r: 0.30,
+            color_g: 0.59,
+            color_b: 0.11,
+            saturation: 0.0,
+            contrast: 1.70,
+            brightness: 1.00,
+            shadow_r: 0,
+            shadow_g: 0,
+            shadow_b: 0,
+            lift_shadows: 0,
+            compress_highlights: 0,
+            grain: 10,
+            vignette: 0.45,
+            is_monochrome: true,
+            tint_r: 1.0,
+            tint_g: 1.0,
+            tint_b: 1.0,
+        }),
+        // Teal & Orange: cinematic look with warm highlights (orange skin/light)
+        // and teal-pushed shadows.
+        "S-Teal" => Some(FilmProfile {
+            color_r: 1.08,
+            color_g: 0.99,
+            color_b: 0.96,
+            saturation: 1.20,
+            contrast: 1.18,
+            brightness: 1.00,
+            shadow_r: 0,
+            shadow_g: 14,
+            shadow_b: 26,
+            lift_shadows: 6,
+            compress_highlights: -4,
+            grain: 6,
+            vignette: 0.22,
+            is_monochrome: false,
+            tint_r: 1.0,
+            tint_g: 1.0,
+            tint_b: 1.0,
+        }),
+        // Lomo / toy camera: oversaturated, punchy, heavy vignette and grain.
+        "S-Lomo" => Some(FilmProfile {
+            color_r: 1.06,
+            color_g: 1.02,
+            color_b: 1.00,
+            saturation: 1.70,
+            contrast: 1.35,
+            brightness: 1.00,
+            shadow_r: 6,
+            shadow_g: 4,
+            shadow_b: 18,
+            lift_shadows: 4,
+            compress_highlights: -6,
+            grain: 16,
+            vignette: 0.65,
+            is_monochrome: false,
+            tint_r: 1.0,
+            tint_g: 1.0,
+            tint_b: 1.0,
+        }),
+        // Fujifilm Velvia: high-saturation landscape stock with strong greens
+        // and blues and a punchy contrast curve.
+        "S-Fuji" => Some(FilmProfile {
+            color_r: 0.98,
+            color_g: 1.04,
+            color_b: 1.06,
+            saturation: 1.55,
+            contrast: 1.25,
+            brightness: 1.00,
+            shadow_r: 0,
+            shadow_g: 8,
+            shadow_b: 6,
+            lift_shadows: 0,
+            compress_highlights: -6,
+            grain: 4,
+            vignette: 0.12,
+            is_monochrome: false,
+            tint_r: 1.0,
+            tint_g: 1.0,
+            tint_b: 1.0,
+        }),
+        // Selenium-toned B&W: cool, slightly purple tone.
+        "S-Selenium" => Some(FilmProfile {
+            color_r: 0.30,
+            color_g: 0.59,
+            color_b: 0.11,
+            saturation: 0.0,
+            contrast: 1.30,
+            brightness: 1.00,
+            shadow_r: 0,
+            shadow_g: 0,
+            shadow_b: 0,
+            lift_shadows: 0,
+            compress_highlights: 0,
+            grain: 8,
+            vignette: 0.28,
+            is_monochrome: true,
+            tint_r: 0.94,
+            tint_g: 0.96,
+            tint_b: 1.10,
+        }),
+        // Platinum / palladium print: warm-neutral, soft low-contrast tone with
+        // a long tonal range.
+        "S-Platinum" => Some(FilmProfile {
+            color_r: 0.30,
+            color_g: 0.59,
+            color_b: 0.11,
+            saturation: 0.0,
+            contrast: 0.92,
+            brightness: 1.02,
+            shadow_r: 0,
+            shadow_g: 0,
+            shadow_b: 0,
+            lift_shadows: 14,
+            compress_highlights: -8,
+            grain: 6,
+            vignette: 0.20,
+            is_monochrome: true,
+            tint_r: 1.08,
+            tint_g: 1.02,
+            tint_b: 0.90,
         }),
         _ => None,
     }
@@ -302,6 +503,11 @@ fn process_filter_generic<const MONO: bool, const VIG: bool, const GRAIN: bool>(
     let sat_inv_w = ((1.0 - p.saturation) * 1024.0) as i32;
     let sat_w = (p.saturation * 1024.0) as i32;
 
+    // Monochrome tint weights (10-bit Fixed-Point). Only used on the MONO path.
+    let tint_r_w = (p.tint_r * 1024.0) as u32;
+    let tint_g_w = (p.tint_g * 1024.0) as u32;
+    let tint_b_w = (p.tint_b * 1024.0) as u32;
+
     // Vignette factor (scaled by 2^24 to prevent division underflows)
     let vig_scale = if VIG {
         (p.vignette * 16777216.0 / max_dist_sq) as u64
@@ -340,9 +546,11 @@ fn process_filter_generic<const MONO: bool, const VIG: bool, const GRAIN: bool>(
                         >> 10;
                     let t_lum = trix_lut[lum.min(255) as usize];
                     let f_lum = cb_lut[t_lum as usize] as u32;
-                    r = f_lum;
-                    g = f_lum;
-                    b = f_lum;
+                    // Tint the neutral luminance (Fixed-Point). Neutral tint
+                    // (1024/1024/1024) leaves f_lum unchanged.
+                    r = ((f_lum * tint_r_w) >> 10).min(255);
+                    g = ((f_lum * tint_g_w) >> 10).min(255);
+                    b = ((f_lum * tint_b_w) >> 10).min(255);
                 } else {
                     // 1. Point LUT transform
                     let r_tone = r_lut[row[idx] as usize] as i32;

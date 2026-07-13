@@ -8,7 +8,7 @@ Developed to accelerate on-device photo processing, `saturnix-filter` delivers a
 
 - Zero-Copy Memory Model: Manipulates Pillow image bytes directly in memory space
 - Parallel Execution: Distributes row-by-row pixel computations across all available CPU cores using `rayon`.
-- 11 Complete Film Styles:
+- 19 Complete Film Styles:
   - `S-Gold` (Kodak Gold warm vintage style)
   - `S-Vivid` (Kodak Ektar ultra-saturated style)
   - `S-Natural` (Fujifilm organic greens style)
@@ -19,6 +19,14 @@ Developed to accelerate on-device photo processing, `saturnix-filter` delivers a
   - `S-Cross` (Cross-processed E-6-in-C-41 high-contrast style)
   - `S-Faded` (Sun-faded vintage print with milky lifted blacks)
   - `S-Bleach` (Bleach-bypass desaturated high-contrast silver style)
+  - `S-Sepia` (Warm brown-toned B&W)
+  - `S-Cyano` (Cool blue Cyanotype-toned B&W)
+  - `S-Noir` (High-contrast neutral B&W with heavy vignette)
+  - `S-Teal` (Cinematic teal-and-orange style)
+  - `S-Lomo` (Lomography toy-camera oversaturated style)
+  - `S-Fuji` (Fujifilm Velvia high-saturation landscape style)
+  - `S-Selenium` (Cool selenium-toned B&W)
+  - `S-Platinum` (Warm, soft platinum-print-toned B&W)
   - `VHS` (Vintage VHS tape simulation)
 
 ## Examples
@@ -38,6 +46,14 @@ Each column is one source photo; each row is the same image with a filter applie
 | S-Cross     | ![](docs/examples/s_01_s-cross.jpg)   | ![](docs/examples/s_02_s-cross.jpg)   | ![](docs/examples/s_03_s-cross.jpg)   | ![](docs/examples/s_04_s-cross.jpg)   |
 | S-Faded     | ![](docs/examples/s_01_s-faded.jpg)   | ![](docs/examples/s_02_s-faded.jpg)   | ![](docs/examples/s_03_s-faded.jpg)   | ![](docs/examples/s_04_s-faded.jpg)   |
 | S-Bleach    | ![](docs/examples/s_01_s-bleach.jpg)  | ![](docs/examples/s_02_s-bleach.jpg)  | ![](docs/examples/s_03_s-bleach.jpg)  | ![](docs/examples/s_04_s-bleach.jpg)  |
+| S-Sepia     | ![](docs/examples/s_01_s-sepia.jpg)   | ![](docs/examples/s_02_s-sepia.jpg)   | ![](docs/examples/s_03_s-sepia.jpg)   | ![](docs/examples/s_04_s-sepia.jpg)   |
+| S-Cyano     | ![](docs/examples/s_01_s-cyano.jpg)   | ![](docs/examples/s_02_s-cyano.jpg)   | ![](docs/examples/s_03_s-cyano.jpg)   | ![](docs/examples/s_04_s-cyano.jpg)   |
+| S-Noir      | ![](docs/examples/s_01_s-noir.jpg)    | ![](docs/examples/s_02_s-noir.jpg)    | ![](docs/examples/s_03_s-noir.jpg)    | ![](docs/examples/s_04_s-noir.jpg)    |
+| S-Teal      | ![](docs/examples/s_01_s-teal.jpg)    | ![](docs/examples/s_02_s-teal.jpg)    | ![](docs/examples/s_03_s-teal.jpg)    | ![](docs/examples/s_04_s-teal.jpg)    |
+| S-Lomo      | ![](docs/examples/s_01_s-lomo.jpg)    | ![](docs/examples/s_02_s-lomo.jpg)    | ![](docs/examples/s_03_s-lomo.jpg)    | ![](docs/examples/s_04_s-lomo.jpg)    |
+| S-Fuji      | ![](docs/examples/s_01_s-fuji.jpg)    | ![](docs/examples/s_02_s-fuji.jpg)    | ![](docs/examples/s_03_s-fuji.jpg)    | ![](docs/examples/s_04_s-fuji.jpg)    |
+| S-Selenium  | ![](docs/examples/s_01_s-selenium.jpg)| ![](docs/examples/s_02_s-selenium.jpg)| ![](docs/examples/s_03_s-selenium.jpg)| ![](docs/examples/s_04_s-selenium.jpg)|
+| S-Platinum  | ![](docs/examples/s_01_s-platinum.jpg)| ![](docs/examples/s_02_s-platinum.jpg)| ![](docs/examples/s_03_s-platinum.jpg)| ![](docs/examples/s_04_s-platinum.jpg)|
 | VHS         | ![](docs/examples/s_01_vhs.jpg)       | ![](docs/examples/s_02_vhs.jpg)       | ![](docs/examples/s_03_vhs.jpg)       | ![](docs/examples/s_04_vhs.jpg)       |
 
 ## Installation
@@ -63,7 +79,9 @@ buf = bytearray(img.tobytes())
 
 # 3. Apply the filter instantly inside RAM
 # Supported options: "S-Gold", "S-Vivid", "S-Natural", "S-Saturnix", "S-MonoX",
-#                    "S-Portra", "S-Cinestill", "S-Cross", "S-Faded", "S-Bleach", "VHS"
+#                    "S-Portra", "S-Cinestill", "S-Cross", "S-Faded", "S-Bleach",
+#                    "S-Sepia", "S-Cyano", "S-Noir", "S-Teal", "S-Lomo", "S-Fuji",
+#                    "S-Selenium", "S-Platinum", "VHS"
 saturnix_filter.apply_film_inplace(buf, width, height, "S-Saturnix")
 
 # 4. Re-construct the Pillow image from the modified buffer
