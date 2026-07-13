@@ -8,13 +8,37 @@ Developed to accelerate on-device photo processing, `saturnix-filter` delivers a
 
 - Zero-Copy Memory Model: Manipulates Pillow image bytes directly in memory space
 - Parallel Execution: Distributes row-by-row pixel computations across all available CPU cores using `rayon`.
-- 6 Complete Film Styles:
+- 11 Complete Film Styles:
   - `S-Gold` (Kodak Gold warm vintage style)
   - `S-Vivid` (Kodak Ektar ultra-saturated style)
   - `S-Natural` (Fujifilm organic greens style)
   - `S-Saturnix` (Signature cel-animation glow style)
   - `S-MonoX` (Kodak Tri-X 400 panchromatic S-curve B&W style)
+  - `S-Portra` (Kodak Portra 400 soft, warm skin-tone style)
+  - `S-Cinestill` (Cinestill 800T cool tungsten / teal-shadow style)
+  - `S-Cross` (Cross-processed E-6-in-C-41 high-contrast style)
+  - `S-Faded` (Sun-faded vintage print with milky lifted blacks)
+  - `S-Bleach` (Bleach-bypass desaturated high-contrast silver style)
   - `VHS` (Vintage VHS tape simulation)
+
+## Examples
+
+Each column is one source photo; each row is the same image with a filter applied.
+
+|             | Sample 01                             | Sample 02                             | Sample 03                             | Sample 04                             |
+| :---------- | :------------------------------------ | :------------------------------------ | :------------------------------------ | :------------------------------------ |
+| Original    | ![](docs/examples/s_01_original.jpg)  | ![](docs/examples/s_02_original.jpg)  | ![](docs/examples/s_03_original.jpg)  | ![](docs/examples/s_04_original.jpg)  |
+| S-Gold      | ![](docs/examples/s_01_s-gold.jpg)    | ![](docs/examples/s_02_s-gold.jpg)    | ![](docs/examples/s_03_s-gold.jpg)    | ![](docs/examples/s_04_s-gold.jpg)    |
+| S-Vivid     | ![](docs/examples/s_01_s-vivid.jpg)   | ![](docs/examples/s_02_s-vivid.jpg)   | ![](docs/examples/s_03_s-vivid.jpg)   | ![](docs/examples/s_04_s-vivid.jpg)   |
+| S-Natural   | ![](docs/examples/s_01_s-natural.jpg) | ![](docs/examples/s_02_s-natural.jpg) | ![](docs/examples/s_03_s-natural.jpg) | ![](docs/examples/s_04_s-natural.jpg) |
+| S-Saturnix  | ![](docs/examples/s_01_s-saturnix.jpg)| ![](docs/examples/s_02_s-saturnix.jpg)| ![](docs/examples/s_03_s-saturnix.jpg)| ![](docs/examples/s_04_s-saturnix.jpg)|
+| S-MonoX     | ![](docs/examples/s_01_s-monox.jpg)   | ![](docs/examples/s_02_s-monox.jpg)   | ![](docs/examples/s_03_s-monox.jpg)   | ![](docs/examples/s_04_s-monox.jpg)   |
+| S-Portra    | ![](docs/examples/s_01_s-portra.jpg)  | ![](docs/examples/s_02_s-portra.jpg)  | ![](docs/examples/s_03_s-portra.jpg)  | ![](docs/examples/s_04_s-portra.jpg)  |
+| S-Cinestill | ![](docs/examples/s_01_s-cinestill.jpg)| ![](docs/examples/s_02_s-cinestill.jpg)| ![](docs/examples/s_03_s-cinestill.jpg)| ![](docs/examples/s_04_s-cinestill.jpg)|
+| S-Cross     | ![](docs/examples/s_01_s-cross.jpg)   | ![](docs/examples/s_02_s-cross.jpg)   | ![](docs/examples/s_03_s-cross.jpg)   | ![](docs/examples/s_04_s-cross.jpg)   |
+| S-Faded     | ![](docs/examples/s_01_s-faded.jpg)   | ![](docs/examples/s_02_s-faded.jpg)   | ![](docs/examples/s_03_s-faded.jpg)   | ![](docs/examples/s_04_s-faded.jpg)   |
+| S-Bleach    | ![](docs/examples/s_01_s-bleach.jpg)  | ![](docs/examples/s_02_s-bleach.jpg)  | ![](docs/examples/s_03_s-bleach.jpg)  | ![](docs/examples/s_04_s-bleach.jpg)  |
+| VHS         | ![](docs/examples/s_01_vhs.jpg)       | ![](docs/examples/s_02_vhs.jpg)       | ![](docs/examples/s_03_vhs.jpg)       | ![](docs/examples/s_04_vhs.jpg)       |
 
 ## Installation
 
@@ -38,7 +62,8 @@ width, height = img.size
 buf = bytearray(img.tobytes())
 
 # 3. Apply the filter instantly inside RAM
-# Supported options: "S-Gold", "S-Vivid", "S-Natural", "S-Saturnix", "S-MonoX", "VHS"
+# Supported options: "S-Gold", "S-Vivid", "S-Natural", "S-Saturnix", "S-MonoX",
+#                    "S-Portra", "S-Cinestill", "S-Cross", "S-Faded", "S-Bleach", "VHS"
 saturnix_filter.apply_film_inplace(buf, width, height, "S-Saturnix")
 
 # 4. Re-construct the Pillow image from the modified buffer
