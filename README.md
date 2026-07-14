@@ -180,9 +180,9 @@ saturation, contrast, vignette, grain); the Pipeline column lists the extra stag
 | S-Matrix     | –               | 0.354 s               | –           | mix, split-tone         |
 | S-Cine       | –               | 0.241 s               | –           | s-curve, split-tone     |
 | S-Leak       | –               | 0.320 s               | –           | leak                    |
-| S-CA         | –               | 0.852 s               | –           | CA                      |
-| S-Cinestill  | –               | 1.600 s               | –           | mix, halation           |
-| S-Halation   | –               | 1.490 s               | –           | halation                |
+| S-CA         | –               | 0.637 s               | –           | CA                      |
+| S-Cinestill  | –               | 1.503 s               | –           | mix, halation           |
+| S-Halation   | –               | 1.388 s               | –           | halation                |
 | VHS          | 18.452 s        | 0.351 s               | **~52.6x**  | dedicated VHS pipeline  |
 
 ## License

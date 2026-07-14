@@ -1055,6 +1055,7 @@ fn box_blur_v(src: &[u16], dst: &mut [u16], w: usize, h: usize, radius: usize) {
 //
 // Allocations (three small 1/16-size buffers) happen only when this runs, i.e.
 // only for profiles that opt into halation. Point-only profiles never reach it.
+#[allow(clippy::needless_range_loop)]
 fn apply_halation(slice: &mut [u8], width: u32, height: u32, p: &FilmProfile) {
     if p.halation_strength <= 0 {
         return;
@@ -1074,6 +1075,18 @@ fn apply_halation(slice: &mut [u8], width: u32, height: u32, p: &FilmProfile) {
     // a barely-visible bloom. Normalising means a maxed-out highlight yields a
     // full-strength glow while `halation_strength` stays the master intensity.
     let hl_range = (255 - thr).max(1);
+
+    // Precompute a lookup table for excess normalization to avoid division inside the pixel loop.
+    let mut excess_lut = [0u16; 256];
+    for i in 0..256 {
+        excess_lut[i] = ((i as u32 * 255 / hl_range).min(255)) as u16;
+    }
+
+    // Precompute a lookup table for the downscaled x coordinate to avoid division inside the pixel loops.
+    let mut sx_lut = Vec::with_capacity(w);
+    for x in 0..w {
+        sx_lut.push((x * sw / w).min(sw - 1));
+    }
 
     // 1. Extract highlights into the small buffer. Each small cell aggregates
     // the luminance excess above the threshold (normalised to 0..255) over the
@@ -1100,8 +1113,9 @@ fn apply_halation(slice: &mut [u8], width: u32, height: u32, p: &FilmProfile) {
             let lum =
                 (306 * row[idx] as u32 + 601 * row[idx + 1] as u32 + 117 * row[idx + 2] as u32)
                     >> 10;
-            let excess = (lum.saturating_sub(thr) * 255 / hl_range).min(255) as u16;
-            let sx = (x * sw / w).min(sw - 1);
+            let diff = lum.saturating_sub(thr) as usize;
+            let excess = excess_lut[diff];
+            let sx = sx_lut[x];
             let cell = &mut glow[base + sx];
             if excess > *cell {
                 *cell = excess;
@@ -1136,7 +1150,7 @@ fn apply_halation(slice: &mut [u8], width: u32, height: u32, p: &FilmProfile) {
         .for_each(|(y, row)| {
             let sy = (y * sh / h).min(sh - 1);
             for x in 0..w {
-                let sx = (x * sw / w).min(sw - 1);
+                let sx = sx_lut[x];
                 let g = glow[sy * sw + sx] as u32; // 0..255
                 if g == 0 {
                     continue;
@@ -1175,31 +1189,24 @@ fn apply_chromatic_aberration(slice: &mut [u8], width: u32, height: u32, p: &Fil
     // Normalise the offset so it reaches `ca_strength` px at the corner.
     let max_dist = (cx * cx + cy * cy).sqrt().max(1.0);
     let strength = p.ca_strength as f32;
+    let factor = strength / max_dist;
 
     slice
         .par_chunks_mut(w * 3)
         .enumerate()
         .for_each(|(y, row)| {
             let dy = y as f32 - cy;
+            let off_y = dy * factor;
+            let ry = (y as f32 + off_y).round().clamp(0.0, (h - 1) as f32) as usize;
+            let by = (y as f32 - off_y).round().clamp(0.0, (h - 1) as f32) as usize;
+
             for x in 0..w {
                 let dx = x as f32 - cx;
-                let dist = (dx * dx + dy * dy).sqrt();
-                // Per-pixel radial unit vector scaled by the distance-dependent
-                // shift. `shift` px at the corner, 0 at the centre.
-                let shift = strength * dist / max_dist;
-                let (ux, uy) = if dist > 0.0 {
-                    (dx / dist, dy / dist)
-                } else {
-                    (0.0, 0.0)
-                };
-                let off_x = ux * shift;
-                let off_y = uy * shift;
+                let off_x = dx * factor;
 
                 // Red sampled from further out, blue from further in.
                 let rx = (x as f32 + off_x).round().clamp(0.0, (w - 1) as f32) as usize;
-                let ry = (y as f32 + off_y).round().clamp(0.0, (h - 1) as f32) as usize;
                 let bx = (x as f32 - off_x).round().clamp(0.0, (w - 1) as f32) as usize;
-                let by = (y as f32 - off_y).round().clamp(0.0, (h - 1) as f32) as usize;
 
                 let idx = x * 3;
                 row[idx] = src[(ry * w + rx) * 3];
