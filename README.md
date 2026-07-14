@@ -2,7 +2,7 @@
 
 High-performance camera film simulation filters in Rust, designed for the [SATURNIX](https://github.com/Yutani140x/saturnix-camera) open-source camera (Raspberry Pi Zero 2W).
 
-Developed to accelerate on-device photo processing, `saturnix-filter` delivers a ~41x to ~91x speedup over traditional pure-Python image processing on the target Raspberry Pi Zero 2 W hardware by leveraging zero-copy in-memory pixel manipulation, 10-bit fixed-point integer math, and multicore scaling via Rayon.
+Developed to accelerate on-device photo processing, `saturnix-filter` delivers a ~47x to ~134x speedup over traditional pure-Python image processing on the target Raspberry Pi Zero 2 W hardware by leveraging zero-copy in-memory pixel manipulation, 10-bit fixed-point integer math, and multicore scaling via Rayon.
 
 ## Features
 
@@ -143,14 +143,47 @@ All numbers are pure in-memory processing times at full 16 MP camera resolution 
 
 Hardware: Raspberry Pi Zero 2 W (ARM Cortex-A53 quad-core @ 1.0 GHz)
 
-| Filter     | Original Python | **`saturnix-filter`** | **Speedup** |
-| :--------- | :-------------- | :-------------------- | :---------- |
-| S-Gold     | 16.729 s        | 0.375 s               | **~44.6x**  |
-| S-Vivid    | 16.711 s        | 0.405 s               | **~41.3x**  |
-| S-Natural  | 16.702 s        | 0.374 s               | **~44.7x**  |
-| S-Saturnix | 32.083 s        | 0.392 s               | **~81.9x**  |
-| S-MonoX    | 31.841 s        | 0.350 s               | **~91.0x**  |
-| VHS        | 18.452 s        | 0.351 s               | **~52.5x**  |
+All profiles share the same base point operations (tone curve,
+saturation, contrast, vignette, grain); the Pipeline column lists the extra stages that set a profile apart:
+
+- **mono** – monochrome conversion: collapses the image to a tinted luminance channel for black-and-white looks.
+- **mix** – 3×3 channel-mix matrix: blends the R/G/B channels into each other for cross-channel colour shifts.
+- **s-curve** – filmic S-curve tone shaping for richer contrast in the mid-tones while protecting highlights and shadows.
+- **split-tone** – tints highlights and shadows with separate colours (e.g. warm highlights, cool shadows).
+- **leak** – light-leak: adds a coloured flare that falls off from one corner, applied in the main pixel pass.
+- **halation** – bloom post-pass: bright highlights bleed a soft coloured glow into their surroundings (a second image pass, hence slower).
+- **CA** – chromatic aberration post-pass: shifts the red and blue channels radially for lens-style colour fringing (a second image pass, hence slower).
+
+| Filter       | Original Python | **`saturnix-filter`** | **Speedup** | Pipeline (extra stages) |
+| :----------- | :-------------- | :-------------------- | :---------- | :---------------------- |
+| S-Gold       | 16.729 s        | 0.241 s               | **~69.4x**  | –                       |
+| S-Vivid      | 16.711 s        | 0.354 s               | **~47.2x**  | mix                     |
+| S-Natural    | 16.702 s        | 0.240 s               | **~69.6x**  | –                       |
+| S-Saturnix   | 32.083 s        | 0.240 s               | **~133.7x** | –                       |
+| S-MonoX      | 31.841 s        | 0.249 s               | **~127.9x** | mono                    |
+| S-Portra     | –               | 0.240 s               | –           | –                       |
+| S-Cross      | –               | 0.354 s               | –           | mix                     |
+| S-Faded      | –               | 0.240 s               | –           | –                       |
+| S-Bleach     | –               | 0.240 s               | –           | –                       |
+| S-Sepia      | –               | 0.249 s               | –           | mono                    |
+| S-Cyano      | –               | 0.249 s               | –           | mono                    |
+| S-Noir       | –               | 0.249 s               | –           | mono                    |
+| S-Teal       | –               | 0.240 s               | –           | –                       |
+| S-Lomo       | –               | 0.240 s               | –           | –                       |
+| S-Fuji       | –               | 0.354 s               | –           | mix                     |
+| S-Selenium   | –               | 0.249 s               | –           | mono                    |
+| S-Platinum   | –               | 0.249 s               | –           | mono                    |
+| S-Infrared   | –               | 0.354 s               | –           | mix                     |
+| S-SplitTone  | –               | 0.240 s               | –           | split-tone              |
+| S-Kodachrome | –               | 0.355 s               | –           | mix, split-tone         |
+| S-Polaroid   | –               | 0.242 s               | –           | split-tone              |
+| S-Matrix     | –               | 0.354 s               | –           | mix, split-tone         |
+| S-Cine       | –               | 0.241 s               | –           | s-curve, split-tone     |
+| S-Leak       | –               | 0.320 s               | –           | leak                    |
+| S-CA         | –               | 0.852 s               | –           | CA                      |
+| S-Cinestill  | –               | 1.600 s               | –           | mix, halation           |
+| S-Halation   | –               | 1.490 s               | –           | halation                |
+| VHS          | 18.452 s        | 0.351 s               | **~52.6x**  | dedicated VHS pipeline  |
 
 ## License
 
