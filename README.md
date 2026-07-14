@@ -80,6 +80,15 @@ Install the precompiled binary wheel directly from PyPI (no compiler required on
 pip install saturnix-filter
 ```
 
+The core install has no Python dependencies — ideal for the production
+runtime on the Raspberry Pi. To also get the `saturnix-filter` command-line
+tool for experimenting on a PC (image file conversion, gallery rendering),
+install the optional `cli` extra:
+
+```bash
+pip install "saturnix-filter[cli]"
+```
+
 ## Usage
 
 ```python
@@ -105,6 +114,25 @@ saturnix_filter.apply_film_inplace(buf, width, height, "S-Saturnix")
 # 4. Re-construct the Pillow image from the modified buffer
 filtered_img = Image.frombytes("RGB", (width, height), bytes(buf))
 filtered_img.save("photo_filtered.jpg", "JPEG", quality=92)
+```
+
+## Command-line tool
+
+With the `cli` extra installed, the `saturnix-filter` command converts image
+files directly:
+
+```bash
+# Apply a filter (auto-names the output photo_s-gold.jpg next to the input)
+saturnix-filter convert photo.jpg -f S-Gold
+
+# Several filters and/or images at once, downscaled to 1200 px wide
+saturnix-filter convert *.jpg -f S-Gold -f S-Halation --max-width 1200
+
+# List every available filter with a description
+saturnix-filter list
+
+# Apply every filter to one image, rendering a gallery next to it
+saturnix-filter gallery photo.jpg
 ```
 
 ## Performance Comparison

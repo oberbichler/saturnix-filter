@@ -12,10 +12,7 @@ authors = [
     { name = "Thomas Oberbichler", email = "thomas.oberbichler@gmail.com" },
 ]
 requires-python = ">=3.9"
-dependencies = [
-    "pillow>=10.0.0",
-    "numpy>=1.20.0",
-]
+dependencies = []
 classifiers = [
     "Programming Language :: Rust",
     "Programming Language :: Python :: Implementation :: CPython",
@@ -26,13 +23,36 @@ classifiers = [
 ]
 keywords = ["image-processing", "film-simulation", "pyo3", "rust", "raspberry-pi"]
 
+# Optional extras. The `cli` extra pulls in everything the `saturnix`
+# command-line tool needs (image I/O and a friendly terminal UI). It is meant
+# for experimenting on a PC and is NOT required for the production runtime on
+# the Pi. Install with: pip install "saturnix-filter[cli]"
+[project.optional-dependencies]
+cli = [
+    "click>=8.1",
+    "rich>=13.0",
+    "pillow>=10.0.0",
+]
+
+# Console entry point. Only usable when the `cli` extra is installed; otherwise
+# it prints a helpful hint (see saturnix_filter.cli).
+[project.scripts]
+saturnix-filter = "saturnix_filter.cli:main"
+
 [project.urls]
 Homepage = "https://github.com/oberbichler/saturnix-filter"
 Repository = "https://github.com/oberbichler/saturnix-filter"
 Issues = "https://github.com/oberbichler/saturnix-filter/issues"
 
+[tool.maturin]
+# Mixed Rust/Python layout: the compiled extension lives inside the Python
+# package sourced from ./python.
+python-source = "python"
+module-name = "saturnix_filter.saturnix_filter"
+
 [dependency-groups]
 dev = [
     "maturin>=1.5,<2.0",
     "pytest>=7.0",
+    "pillow>=10.0.0",
 ]

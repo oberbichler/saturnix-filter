@@ -104,6 +104,40 @@ impl Default for FilmProfile {
     }
 }
 
+// Canonical list of every filter the library exposes, in display order. This
+// is the single source of truth for filter names; the CLI and docs consume it
+// via `available_filters`. "VHS" is a filter without a FilmProfile and is
+// handled separately by the pipeline.
+const FILTER_NAMES: &[&str] = &[
+    "S-Gold",
+    "S-Vivid",
+    "S-Natural",
+    "S-Saturnix",
+    "S-MonoX",
+    "S-Portra",
+    "S-Cinestill",
+    "S-Cross",
+    "S-Faded",
+    "S-Bleach",
+    "S-Sepia",
+    "S-Cyano",
+    "S-Noir",
+    "S-Teal",
+    "S-Lomo",
+    "S-Fuji",
+    "S-Selenium",
+    "S-Platinum",
+    "S-Infrared",
+    "S-SplitTone",
+    "S-Kodachrome",
+    "S-Polaroid",
+    "S-Matrix",
+    "S-Cine",
+    "S-Leak",
+    "S-Halation",
+    "VHS",
+];
+
 fn get_profile(name: &str) -> Option<FilmProfile> {
     match name {
         "S-Gold" => Some(FilmProfile {
@@ -1249,9 +1283,16 @@ fn apply_film_inplace(
     Ok(())
 }
 
+/// Return the list of every available filter name, in display order.
+#[pyfunction]
+fn available_filters() -> Vec<String> {
+    FILTER_NAMES.iter().map(|s| s.to_string()).collect()
+}
+
 #[pymodule]
 fn saturnix_filter(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(apply_film_inplace, m)?)?;
+    m.add_function(wrap_pyfunction!(available_filters, m)?)?;
     Ok(())
 }
 
@@ -1287,6 +1328,7 @@ mod tests {
         "S-Matrix",
         "S-Cine",
         "S-Leak",
+        "S-Halation",
     ];
 
     // A small deterministic RGB gradient buffer for pixel-exact comparisons.
@@ -1303,6 +1345,39 @@ mod tests {
         buf
     }
 
+    // Every name reported by `available_filters` must resolve to a real
+    // profile, and the list must include the known profiles plus VHS. This
+    // keeps the exported list in sync with `get_profile`.
+    #[test]
+    fn available_filters_are_all_valid() {
+        let filters = available_filters();
+
+        // VHS is a filter but not a FilmProfile, so it is reported yet handled
+        // separately by the pipeline.
+        assert!(
+            filters.iter().any(|f| f == "VHS"),
+            "available_filters must include VHS"
+        );
+
+        for name in &filters {
+            if name == "VHS" {
+                continue;
+            }
+            assert!(
+                get_profile(name).is_some(),
+                "available_filters reported unknown profile: {name}"
+            );
+        }
+
+        // Every profile the tests know about must be advertised.
+        for name in PROFILE_NAMES {
+            assert!(
+                filters.iter().any(|f| f == name),
+                "available_filters is missing profile: {name}"
+            );
+        }
+    }
+
     // Pipeline passthrough invariant: for every existing profile the new
     // `process_image` dispatcher must produce a byte-for-byte identical result
     // to the legacy `process_filter` point-operation path, because none of the
@@ -1312,6 +1387,12 @@ mod tests {
         let (w, h) = (16u32, 12u32);
         for name in PROFILE_NAMES {
             let p = get_profile(name).expect("known profile");
+            // Profiles with a neighbourhood pass legitimately differ from the
+            // pure point-operation path; the invariant only covers point-only
+            // profiles.
+            if needs_prepass(&p) || needs_postpass(&p) {
+                continue;
+            }
 
             let mut via_pipeline = gradient_buffer(w, h);
             process_image(&mut via_pipeline, w, h, &p);
