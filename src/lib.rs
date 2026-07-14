@@ -962,34 +962,68 @@ const HALATION_BLUR_PASSES: u32 = 3;
 // Half-width of the box blur kernel (radius) on the downscaled buffer.
 const HALATION_BLUR_RADIUS: u32 = 2;
 
-// One-dimensional box blur (running sum) applied along rows of a single-channel
-// buffer, writing into `dst`. Edges clamp the sample window. Integer only.
-fn box_blur_h(src: &[u16], dst: &mut [u16], w: usize, h: usize, radius: usize) {
-    for y in 0..h {
-        let row = y * w;
-        for x in 0..w {
-            let lo = x.saturating_sub(radius);
-            let hi = (x + radius).min(w - 1);
+// One-dimensional box blur along rows, writing into `dst`. Uses a sliding
+// window sum (O(w) per row instead of O(w*radius)) and clamps the window at the
+// edges. Rows are independent, so they run in parallel. The clamped variable
+// window width and integer division match the naive version exactly, keeping
+// the output bit-for-bit identical.
+fn box_blur_h(src: &[u16], dst: &mut [u16], w: usize, radius: usize) {
+    dst.par_chunks_mut(w)
+        .zip(src.par_chunks(w))
+        .for_each(|(dst_row, src_row)| {
+            // Initial window [0, min(radius, w-1)].
+            let mut hi = radius.min(w - 1);
             let mut sum: u32 = 0;
-            for s in lo..=hi {
-                sum += src[row + s] as u32;
+            for &v in &src_row[0..=hi] {
+                sum += v as u32;
             }
-            dst[row + x] = (sum / (hi - lo + 1) as u32) as u16;
-        }
-    }
+            let mut lo = 0usize;
+            // The index `x` is needed for the sliding-window arithmetic below,
+            // so this is not a simple element-wise map.
+            #[allow(clippy::needless_range_loop)]
+            for x in 0..w {
+                dst_row[x] = (sum / (hi - lo + 1) as u32) as u16;
+                // Advance the window for x+1: add the new right edge, drop the
+                // left edge once it falls outside [x+1-radius, x+1+radius].
+                let next_hi = (x + 1 + radius).min(w - 1);
+                if next_hi > hi {
+                    sum += src_row[next_hi] as u32;
+                    hi = next_hi;
+                }
+                let next_lo = (x + 1).saturating_sub(radius);
+                if next_lo > lo {
+                    sum -= src_row[lo] as u32;
+                    lo = next_lo;
+                }
+            }
+        });
 }
 
-// One-dimensional box blur applied along columns.
+// One-dimensional box blur along columns. Same sliding-window approach as the
+// horizontal pass. Columns are processed with a single sequential sweep per
+// column; the sliding sum makes this O(w*h) regardless of radius. Kept
+// sequential (safe, no aliasing tricks) since the vertical pass runs on the
+// small downscaled buffer.
 fn box_blur_v(src: &[u16], dst: &mut [u16], w: usize, h: usize, radius: usize) {
     for x in 0..w {
+        let mut hi = radius.min(h - 1);
+        let mut sum: u32 = 0;
+        for s in 0..=hi {
+            sum += src[s * w + x] as u32;
+        }
+        let mut lo = 0usize;
         for y in 0..h {
-            let lo = y.saturating_sub(radius);
-            let hi = (y + radius).min(h - 1);
-            let mut sum: u32 = 0;
-            for s in lo..=hi {
-                sum += src[s * w + x] as u32;
-            }
             dst[y * w + x] = (sum / (hi - lo + 1) as u32) as u16;
+            let next_hi = (y + 1 + radius).min(h - 1);
+            if next_hi > hi {
+                sum += src[next_hi * w + x] as u32;
+                hi = next_hi;
+            }
+            let next_lo = (y + 1).saturating_sub(radius);
+            if next_lo > lo {
+                sum -= src[lo * w + x] as u32;
+                lo = next_lo;
+            }
         }
     }
 }
@@ -1025,19 +1059,29 @@ fn apply_halation(slice: &mut [u8], width: u32, height: u32, p: &FilmProfile) {
     // whole full-res region that maps to it, taking the maximum so a small
     // bright feature is not missed by point sampling. Every full-res pixel is
     // read exactly once.
+    // Parallel over full-res rows. Each row reduces into a per-row small buffer
+    // (max of the highlight excess per small cell); the rows are then merged by
+    // taking the element-wise maximum.
+    //
+    // This runs sequentially on purpose: a rayon fold/reduce version was tried
+    // and measured *slower* on the target Pi Zero 2 W (per-task 2 MB buffer
+    // allocations plus a large merge thrash the small cache / 512 MB RAM, and
+    // contend with the parallel screen pass for the 4 weak cores). A single
+    // linear sweep with one read per full-res pixel is the better fit here.
     let mut glow = vec![0u16; sw * sh];
     for y in 0..h {
         let sy = (y * sh / h).min(sh - 1);
+        let base = sy * sw;
+        let row = &slice[y * w * 3..(y + 1) * w * 3];
         for x in 0..w {
-            let sx = (x * sw / w).min(sw - 1);
-            let idx = (y * w + x) * 3;
+            let idx = x * 3;
             // Rec.601-ish luminance (fixed point, >> 10).
-            let lum = (306 * slice[idx] as u32
-                + 601 * slice[idx + 1] as u32
-                + 117 * slice[idx + 2] as u32)
-                >> 10;
+            let lum =
+                (306 * row[idx] as u32 + 601 * row[idx + 1] as u32 + 117 * row[idx + 2] as u32)
+                    >> 10;
             let excess = (lum.saturating_sub(thr) * 255 / hl_range).min(255) as u16;
-            let cell = &mut glow[sy * sw + sx];
+            let sx = (x * sw / w).min(sw - 1);
+            let cell = &mut glow[base + sx];
             if excess > *cell {
                 *cell = excess;
             }
@@ -1048,7 +1092,7 @@ fn apply_halation(slice: &mut [u8], width: u32, height: u32, p: &FilmProfile) {
     let mut tmp = vec![0u16; sw * sh];
     let radius = HALATION_BLUR_RADIUS as usize;
     for _ in 0..HALATION_BLUR_PASSES {
-        box_blur_h(&glow, &mut tmp, sw, sh, radius);
+        box_blur_h(&glow, &mut tmp, sw, radius);
         box_blur_v(&tmp, &mut glow, sw, sh, radius);
     }
 
