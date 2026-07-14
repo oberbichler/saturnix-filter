@@ -864,6 +864,45 @@ fn process_filter(slice: &mut [u8], width: u32, height: u32, p: &FilmProfile) {
     }
 }
 
+// Whether a profile requests any neighbourhood-based pass (blur/halation/etc).
+// Neighbourhood passes cannot run inside the vectorised point-operation loop
+// without slowing every profile down, so they live in separate passes wrapped
+// around the main `process_filter` call. Point-only profiles report `false`
+// here and take the exact legacy code path with zero extra work.
+fn needs_prepass(_p: &FilmProfile) -> bool {
+    false
+}
+
+fn needs_postpass(_p: &FilmProfile) -> bool {
+    false
+}
+
+// Neighbourhood pass run BEFORE the point-operation filter (e.g. diffusion /
+// blur that should be toned afterwards). No effect is wired up yet.
+fn run_prepass(_slice: &mut [u8], _width: u32, _height: u32, _p: &FilmProfile) {}
+
+// Neighbourhood pass run AFTER the point-operation filter (e.g. halation /
+// bloom / chromatic aberration that act on the finished image). No effect is
+// wired up yet.
+fn run_postpass(_slice: &mut [u8], _width: u32, _height: u32, _p: &FilmProfile) {}
+
+// Image pipeline entry point for film profiles. When a profile only uses point
+// operations (the common case, and all current profiles) this reduces to a
+// single `process_filter` call — byte-for-byte identical to the legacy path,
+// with no extra allocation or copying. Neighbourhood passes only run when a
+// profile explicitly opts in.
+fn process_image(slice: &mut [u8], width: u32, height: u32, p: &FilmProfile) {
+    if needs_prepass(p) {
+        run_prepass(slice, width, height, p);
+    }
+
+    process_filter(slice, width, height, p);
+
+    if needs_postpass(p) {
+        run_postpass(slice, width, height, p);
+    }
+}
+
 fn process_vhs(slice: &mut [u8], width: u32, height: u32) {
     let mut rng_global = SimpleRng::new(123456789);
 
@@ -1033,7 +1072,7 @@ fn apply_film_inplace(
 
     let slice = unsafe { data.as_bytes_mut() };
     match profile {
-        Some(p) => process_filter(slice, width, height, &p),
+        Some(p) => process_image(slice, width, height, &p),
         None => process_vhs(slice, width, height),
     }
     Ok(())
@@ -1043,4 +1082,76 @@ fn apply_film_inplace(
 fn saturnix_filter(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(apply_film_inplace, m)?)?;
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    // Every profile name that `get_profile` knows about, so the passthrough
+    // invariant can be checked exhaustively.
+    const PROFILE_NAMES: &[&str] = &[
+        "S-Gold",
+        "S-Vivid",
+        "S-Natural",
+        "S-Saturnix",
+        "S-MonoX",
+        "S-Portra",
+        "S-Cinestill",
+        "S-Cross",
+        "S-Faded",
+        "S-Bleach",
+        "S-Sepia",
+        "S-Cyano",
+        "S-Noir",
+        "S-Teal",
+        "S-Lomo",
+        "S-Fuji",
+        "S-Selenium",
+        "S-Platinum",
+        "S-Infrared",
+        "S-SplitTone",
+        "S-Kodachrome",
+        "S-Polaroid",
+        "S-Matrix",
+        "S-Cine",
+        "S-Leak",
+    ];
+
+    // A small deterministic RGB gradient buffer for pixel-exact comparisons.
+    fn gradient_buffer(width: u32, height: u32) -> Vec<u8> {
+        let mut buf = vec![0u8; (width * height * 3) as usize];
+        for y in 0..height {
+            for x in 0..width {
+                let idx = ((y * width + x) * 3) as usize;
+                buf[idx] = (x * 255 / width.max(1)) as u8;
+                buf[idx + 1] = (y * 255 / height.max(1)) as u8;
+                buf[idx + 2] = ((x + y) * 255 / (width + height).max(1)) as u8;
+            }
+        }
+        buf
+    }
+
+    // Pipeline passthrough invariant: for every existing profile the new
+    // `process_image` dispatcher must produce a byte-for-byte identical result
+    // to the legacy `process_filter` point-operation path, because none of the
+    // current profiles enable a neighbourhood pass.
+    #[test]
+    fn process_image_matches_process_filter_for_all_profiles() {
+        let (w, h) = (16u32, 12u32);
+        for name in PROFILE_NAMES {
+            let p = get_profile(name).expect("known profile");
+
+            let mut via_pipeline = gradient_buffer(w, h);
+            process_image(&mut via_pipeline, w, h, &p);
+
+            let mut via_legacy = gradient_buffer(w, h);
+            process_filter(&mut via_legacy, w, h, &p);
+
+            assert_eq!(
+                via_pipeline, via_legacy,
+                "profile {name}: process_image diverged from process_filter"
+            );
+        }
+    }
 }
