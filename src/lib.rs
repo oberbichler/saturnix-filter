@@ -58,6 +58,11 @@ struct FilmProfile {
     halation_r: i32,
     halation_g: i32,
     halation_b: i32,
+    // Chromatic aberration (a neighbourhood postpass). Red and blue channels are
+    // sampled with a radial offset that grows towards the image corners, mimicking
+    // a lens's transverse colour fringing. `ca_strength` is the maximum channel
+    // shift in pixels at the corner (0 == disabled).
+    ca_strength: i32,
 }
 
 // Identity channel-mix matrix (no cross-channel mixing).
@@ -100,6 +105,7 @@ impl Default for FilmProfile {
             halation_r: 255,
             halation_g: 255,
             halation_b: 255,
+            ca_strength: 0,
         }
     }
 }
@@ -135,6 +141,7 @@ const FILTER_NAMES: &[&str] = &[
     "S-Cine",
     "S-Leak",
     "S-Halation",
+    "S-CA",
     "VHS",
 ];
 
@@ -609,6 +616,20 @@ fn get_profile(name: &str) -> Option<FilmProfile> {
             halation_b: 45,
             ..Default::default()
         }),
+        // Chromatic aberration: a lo-fi lens look with pronounced red/blue
+        // colour fringing towards the edges, over a punchy, slightly vignetted
+        // base reminiscent of a cheap wide-angle or toy-camera lens.
+        "S-CA" => Some(FilmProfile {
+            color_r: 1.02,
+            color_g: 1.00,
+            color_b: 1.02,
+            saturation: 1.20,
+            contrast: 1.10,
+            grain: 6,
+            vignette: 0.30,
+            ca_strength: 8,
+            ..Default::default()
+        }),
         _ => None,
     }
 }
@@ -945,7 +966,7 @@ fn needs_prepass(_p: &FilmProfile) -> bool {
 }
 
 fn needs_postpass(p: &FilmProfile) -> bool {
-    p.halation_strength > 0
+    p.halation_strength > 0 || p.ca_strength > 0
 }
 
 // Neighbourhood pass run BEFORE the point-operation filter (e.g. diffusion /
@@ -1133,10 +1154,66 @@ fn apply_halation(slice: &mut [u8], width: u32, height: u32, p: &FilmProfile) {
         });
 }
 
+// Chromatic aberration postpass. Samples the red and blue channels with equal
+// and opposite radial offsets that grow linearly from 0 at the centre to
+// `ca_strength` pixels at the corners, reproducing a lens's transverse colour
+// fringing. Green is left in place. Reads from a copy so the offset lookups see
+// the un-shifted image; writes back into `slice`. Parallel over rows.
+fn apply_chromatic_aberration(slice: &mut [u8], width: u32, height: u32, p: &FilmProfile) {
+    if p.ca_strength <= 0 {
+        return;
+    }
+    let w = width as usize;
+    let h = height as usize;
+    if w == 0 || h == 0 {
+        return;
+    }
+
+    let src = slice.to_vec();
+    let cx = (w as f32 - 1.0) / 2.0;
+    let cy = (h as f32 - 1.0) / 2.0;
+    // Normalise the offset so it reaches `ca_strength` px at the corner.
+    let max_dist = (cx * cx + cy * cy).sqrt().max(1.0);
+    let strength = p.ca_strength as f32;
+
+    slice
+        .par_chunks_mut(w * 3)
+        .enumerate()
+        .for_each(|(y, row)| {
+            let dy = y as f32 - cy;
+            for x in 0..w {
+                let dx = x as f32 - cx;
+                let dist = (dx * dx + dy * dy).sqrt();
+                // Per-pixel radial unit vector scaled by the distance-dependent
+                // shift. `shift` px at the corner, 0 at the centre.
+                let shift = strength * dist / max_dist;
+                let (ux, uy) = if dist > 0.0 {
+                    (dx / dist, dy / dist)
+                } else {
+                    (0.0, 0.0)
+                };
+                let off_x = ux * shift;
+                let off_y = uy * shift;
+
+                // Red sampled from further out, blue from further in.
+                let rx = (x as f32 + off_x).round().clamp(0.0, (w - 1) as f32) as usize;
+                let ry = (y as f32 + off_y).round().clamp(0.0, (h - 1) as f32) as usize;
+                let bx = (x as f32 - off_x).round().clamp(0.0, (w - 1) as f32) as usize;
+                let by = (y as f32 - off_y).round().clamp(0.0, (h - 1) as f32) as usize;
+
+                let idx = x * 3;
+                row[idx] = src[(ry * w + rx) * 3];
+                // green unchanged (row[idx + 1] already correct)
+                row[idx + 2] = src[(by * w + bx) * 3 + 2];
+            }
+        });
+}
+
 // Neighbourhood pass run AFTER the point-operation filter (e.g. halation /
 // bloom / chromatic aberration that act on the finished image).
 fn run_postpass(slice: &mut [u8], width: u32, height: u32, p: &FilmProfile) {
     apply_halation(slice, width, height, p);
+    apply_chromatic_aberration(slice, width, height, p);
 }
 
 // Image pipeline entry point for film profiles. When a profile only uses point
@@ -1377,6 +1454,7 @@ mod tests {
         "S-Cine",
         "S-Leak",
         "S-Halation",
+        "S-CA",
     ];
 
     // A small deterministic RGB gradient buffer for pixel-exact comparisons.
@@ -1503,6 +1581,48 @@ mod tests {
             "warm halation: red glow ({}) should exceed blue glow ({})",
             buf[probe],
             buf[probe + 2]
+        );
+    }
+
+    // Chromatic aberration is a neighbourhood effect: red and blue channels are
+    // sampled with opposite radial offsets, so a sharp grey edge (R == B
+    // everywhere) develops a colour fringe (R != B) that a point operation
+    // could never create.
+    #[test]
+    fn chromatic_aberration_splits_channels_at_edge() {
+        let (w, h) = (64u32, 64u32);
+        // A vertical grey edge far to the right of centre (x == 50). The radial
+        // CA offset there is almost purely horizontal, so red and blue separate
+        // across the edge. Every pixel starts neutral (R == G == B).
+        let mut buf = vec![0u8; (w * h * 3) as usize];
+        for y in 0..h {
+            for x in 50..w {
+                let idx = ((y * w + x) * 3) as usize;
+                buf[idx] = 180;
+                buf[idx + 1] = 180;
+                buf[idx + 2] = 180;
+            }
+        }
+
+        let p = FilmProfile {
+            ca_strength: 6,
+            ..Default::default()
+        };
+        apply_chromatic_aberration(&mut buf, w, h, &p);
+
+        // On the centre row (y ~ 32) near the edge, look for a pixel where red
+        // and blue diverge — the colour fringe. No such split can exist without
+        // a neighbourhood shift.
+        let mut max_split = 0i32;
+        let y = 32u32;
+        for x in 44..56u32 {
+            let idx = ((y * w + x) * 3) as usize;
+            let split = (buf[idx] as i32 - buf[idx + 2] as i32).abs();
+            max_split = max_split.max(split);
+        }
+        assert!(
+            max_split > 30,
+            "expected a red/blue fringe at the edge, max split was {max_split}"
         );
     }
 }

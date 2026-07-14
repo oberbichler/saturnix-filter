@@ -33,6 +33,7 @@ FILTER_DESCRIPTIONS = {
     "S-Cine": "Filmic S-curve digital-cinema grade",
     "S-Leak": "Warm light-leak flare from the corner",
     "S-Halation": "Warm red-orange glow blooming from highlights",
+    "S-CA": "Lo-fi lens look with red/blue chromatic-aberration fringing",
     "VHS": "Vintage VHS tape simulation",
 }
 

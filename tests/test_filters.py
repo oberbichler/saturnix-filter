@@ -31,6 +31,7 @@ FILTERS = [
     "S-Cine",
     "S-Leak",
     "S-Halation",
+    "S-CA",
     "VHS",
 ]
 
