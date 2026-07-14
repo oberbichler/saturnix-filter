@@ -30,6 +30,7 @@ FILTERS = [
     "S-Matrix",
     "S-Cine",
     "S-Leak",
+    "S-Halation",
     "VHS",
 ]
 
@@ -183,3 +184,25 @@ def test_cine_scurve_increases_contrast():
 
     assert dr < 64  # shadows pushed down
     assert br > 192  # highlights pushed up
+
+
+def test_halation_bleeds_glow_from_highlight():
+    # Halation is a neighbourhood effect: a bright block bleeds a warm glow into
+    # surrounding dark pixels that a pure point operation could never brighten.
+    w, h = 64, 64
+    buf = bytearray(w * h * 3)  # all black
+    # Bright white block in the centre.
+    for y in range(28, 36):
+        for x in range(28, 36):
+            idx = (y * w + x) * 3
+            buf[idx] = buf[idx + 1] = buf[idx + 2] = 255
+
+    # A dark pixel a few pixels away from the block.
+    probe = (24 * w + 24) * 3
+    assert buf[probe] == 0
+
+    saturnix_filter.apply_film_inplace(buf, w, h, "S-Halation")
+
+    # The probe gained glow, and the warm tint means red exceeds blue.
+    assert buf[probe] > 0
+    assert buf[probe] > buf[probe + 2]

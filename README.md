@@ -34,6 +34,7 @@ Developed to accelerate on-device photo processing, `saturnix-filter` delivers a
   - `S-Matrix` (Digital-dystopia green cast)
   - `S-Cine` (Filmic S-curve digital-cinema grade)
   - `S-Leak` (Warm light-leak flare from the corner)
+  - `S-Halation` (Warm red-orange glow blooming from highlights)
   - `VHS` (Vintage VHS tape simulation)
 
 ## Examples
@@ -68,6 +69,7 @@ Each column is one source photo; each row is the same image with a filter applie
 | S-Matrix    | ![](docs/examples/s_01_s-matrix.jpg)  | ![](docs/examples/s_02_s-matrix.jpg)  | ![](docs/examples/s_03_s-matrix.jpg)  | ![](docs/examples/s_04_s-matrix.jpg)  |
 | S-Cine      | ![](docs/examples/s_01_s-cine.jpg)    | ![](docs/examples/s_02_s-cine.jpg)    | ![](docs/examples/s_03_s-cine.jpg)    | ![](docs/examples/s_04_s-cine.jpg)    |
 | S-Leak      | ![](docs/examples/s_01_s-leak.jpg)    | ![](docs/examples/s_02_s-leak.jpg)    | ![](docs/examples/s_03_s-leak.jpg)    | ![](docs/examples/s_04_s-leak.jpg)    |
+| S-Halation  | ![](docs/examples/s_01_s-halation.jpg)| ![](docs/examples/s_02_s-halation.jpg)| ![](docs/examples/s_03_s-halation.jpg)| ![](docs/examples/s_04_s-halation.jpg)|
 | VHS         | ![](docs/examples/s_01_vhs.jpg)       | ![](docs/examples/s_02_vhs.jpg)       | ![](docs/examples/s_03_vhs.jpg)       | ![](docs/examples/s_04_vhs.jpg)       |
 
 ## Installation
@@ -97,7 +99,7 @@ buf = bytearray(img.tobytes())
 #                    "S-Sepia", "S-Cyano", "S-Noir", "S-Teal", "S-Lomo", "S-Fuji",
 #                    "S-Selenium", "S-Platinum", "S-Infrared", "S-SplitTone",
 #                    "S-Kodachrome", "S-Polaroid", "S-Matrix", "S-Cine",
-#                    "S-Leak", "VHS"
+#                    "S-Leak", "S-Halation", "VHS"
 saturnix_filter.apply_film_inplace(buf, width, height, "S-Saturnix")
 
 # 4. Re-construct the Pillow image from the modified buffer

@@ -49,6 +49,15 @@ struct FilmProfile {
     leak_g: i32,
     leak_b: i32,
     leak_corner: u8,
+    // Halation / bloom (a neighbourhood postpass, not a point operation).
+    // Bright highlights above `halation_threshold` bleed a soft coloured glow
+    // (halation_r/g/b tint) into their surroundings, screened back onto the
+    // image with `halation_strength` (0 == disabled, 255 == full strength).
+    halation_strength: i32,
+    halation_threshold: i32,
+    halation_r: i32,
+    halation_g: i32,
+    halation_b: i32,
 }
 
 // Identity channel-mix matrix (no cross-channel mixing).
@@ -86,6 +95,11 @@ impl Default for FilmProfile {
             leak_g: 0,
             leak_b: 0,
             leak_corner: 0,
+            halation_strength: 0,
+            halation_threshold: 200,
+            halation_r: 255,
+            halation_g: 255,
+            halation_b: 255,
         }
     }
 }
@@ -534,6 +548,25 @@ fn get_profile(name: &str) -> Option<FilmProfile> {
             leak_corner: 1,
             ..Default::default()
         }),
+        // Halation / bloom: a warm red-orange glow blooms out of bright
+        // highlights (the classic film halation look, as seen around neon and
+        // bright light sources). Built on a mildly cool, contrasty base so the
+        // warm glow stands out.
+        "S-Halation" => Some(FilmProfile {
+            color_r: 1.00,
+            color_g: 1.00,
+            color_b: 1.02,
+            saturation: 1.12,
+            contrast: 1.15,
+            grain: 6,
+            vignette: 0.18,
+            halation_strength: 170,
+            halation_threshold: 175,
+            halation_r: 255,
+            halation_g: 100,
+            halation_b: 45,
+            ..Default::default()
+        }),
         _ => None,
     }
 }
@@ -873,18 +906,156 @@ fn needs_prepass(_p: &FilmProfile) -> bool {
     false
 }
 
-fn needs_postpass(_p: &FilmProfile) -> bool {
-    false
+fn needs_postpass(p: &FilmProfile) -> bool {
+    p.halation_strength > 0
 }
 
 // Neighbourhood pass run BEFORE the point-operation filter (e.g. diffusion /
 // blur that should be toned afterwards). No effect is wired up yet.
 fn run_prepass(_slice: &mut [u8], _width: u32, _height: u32, _p: &FilmProfile) {}
 
+// Downscale factor for the halation glow buffer. The glow is soft and
+// low-frequency, so computing it at 1/4 resolution (1/16 the pixels) is
+// visually indistinguishable while being far cheaper on the Pi.
+const HALATION_DOWNSCALE: u32 = 4;
+// Number of separable box-blur passes over the small buffer. Repeated box
+// blurs approximate a Gaussian; 3 passes give a smooth glow.
+const HALATION_BLUR_PASSES: u32 = 3;
+// Half-width of the box blur kernel (radius) on the downscaled buffer.
+const HALATION_BLUR_RADIUS: u32 = 2;
+
+// One-dimensional box blur (running sum) applied along rows of a single-channel
+// buffer, writing into `dst`. Edges clamp the sample window. Integer only.
+fn box_blur_h(src: &[u16], dst: &mut [u16], w: usize, h: usize, radius: usize) {
+    for y in 0..h {
+        let row = y * w;
+        for x in 0..w {
+            let lo = x.saturating_sub(radius);
+            let hi = (x + radius).min(w - 1);
+            let mut sum: u32 = 0;
+            for s in lo..=hi {
+                sum += src[row + s] as u32;
+            }
+            dst[row + x] = (sum / (hi - lo + 1) as u32) as u16;
+        }
+    }
+}
+
+// One-dimensional box blur applied along columns.
+fn box_blur_v(src: &[u16], dst: &mut [u16], w: usize, h: usize, radius: usize) {
+    for x in 0..w {
+        for y in 0..h {
+            let lo = y.saturating_sub(radius);
+            let hi = (y + radius).min(h - 1);
+            let mut sum: u32 = 0;
+            for s in lo..=hi {
+                sum += src[s * w + x] as u32;
+            }
+            dst[y * w + x] = (sum / (hi - lo + 1) as u32) as u16;
+        }
+    }
+}
+
+// Halation / bloom postpass. Extracts highlights above the threshold into a
+// small downscaled single-channel mask, blurs it into a soft glow, then screens
+// a coloured version of that glow back onto the full-resolution image.
+//
+// Allocations (three small 1/16-size buffers) happen only when this runs, i.e.
+// only for profiles that opt into halation. Point-only profiles never reach it.
+fn apply_halation(slice: &mut [u8], width: u32, height: u32, p: &FilmProfile) {
+    if p.halation_strength <= 0 {
+        return;
+    }
+    let w = width as usize;
+    let h = height as usize;
+    if w == 0 || h == 0 {
+        return;
+    }
+
+    let sw = (width / HALATION_DOWNSCALE).max(1) as usize;
+    let sh = (height / HALATION_DOWNSCALE).max(1) as usize;
+    let thr = p.halation_threshold.clamp(0, 254) as u32;
+    // Luminance range above the threshold, used to normalise the highlight
+    // excess to the full 0..255 glow range. Without this, a threshold of 175
+    // would cap even a pure-white (255) highlight's glow at only 80, producing
+    // a barely-visible bloom. Normalising means a maxed-out highlight yields a
+    // full-strength glow while `halation_strength` stays the master intensity.
+    let hl_range = (255 - thr).max(1);
+
+    // 1. Extract highlights into the small buffer. Each small cell aggregates
+    // the luminance excess above the threshold (normalised to 0..255) over the
+    // whole full-res region that maps to it, taking the maximum so a small
+    // bright feature is not missed by point sampling. Every full-res pixel is
+    // read exactly once.
+    let mut glow = vec![0u16; sw * sh];
+    for y in 0..h {
+        let sy = (y * sh / h).min(sh - 1);
+        for x in 0..w {
+            let sx = (x * sw / w).min(sw - 1);
+            let idx = (y * w + x) * 3;
+            // Rec.601-ish luminance (fixed point, >> 10).
+            let lum = (306 * slice[idx] as u32
+                + 601 * slice[idx + 1] as u32
+                + 117 * slice[idx + 2] as u32)
+                >> 10;
+            let excess = (lum.saturating_sub(thr) * 255 / hl_range).min(255) as u16;
+            let cell = &mut glow[sy * sw + sx];
+            if excess > *cell {
+                *cell = excess;
+            }
+        }
+    }
+
+    // 2. Separable box blur, several passes, into a soft low-frequency glow.
+    let mut tmp = vec![0u16; sw * sh];
+    let radius = HALATION_BLUR_RADIUS as usize;
+    for _ in 0..HALATION_BLUR_PASSES {
+        box_blur_h(&glow, &mut tmp, sw, sh, radius);
+        box_blur_v(&tmp, &mut glow, sw, sh, radius);
+    }
+
+    // 3. Screen the coloured glow back onto the full image. For each full-res
+    // pixel, bilinear-free nearest lookup into the small glow buffer keeps it
+    // cheap; the glow is smooth so blockiness is invisible.
+    //
+    // add = glow * tint * strength, all in fixed point. `screen` blend
+    // (255 - (255-a)*(255-b)/255) avoids harsh clipping in bright areas.
+    let str_w = p.halation_strength.clamp(0, 255) as u32;
+    let tint = [
+        p.halation_r.clamp(0, 255) as u32,
+        p.halation_g.clamp(0, 255) as u32,
+        p.halation_b.clamp(0, 255) as u32,
+    ];
+
+    slice
+        .par_chunks_mut(w * 3)
+        .enumerate()
+        .for_each(|(y, row)| {
+            let sy = (y * sh / h).min(sh - 1);
+            for x in 0..w {
+                let sx = (x * sw / w).min(sw - 1);
+                let g = glow[sy * sw + sx] as u32; // 0..255
+                if g == 0 {
+                    continue;
+                }
+                let idx = x * 3;
+                for c in 0..3 {
+                    // Coloured glow contribution for this channel, 0..255.
+                    let add = (g * tint[c] * str_w) / (255 * 255);
+                    let base = row[idx + c] as u32;
+                    // Screen blend.
+                    let blended = 255 - ((255 - base) * (255 - add.min(255)) / 255);
+                    row[idx + c] = blended.min(255) as u8;
+                }
+            }
+        });
+}
+
 // Neighbourhood pass run AFTER the point-operation filter (e.g. halation /
-// bloom / chromatic aberration that act on the finished image). No effect is
-// wired up yet.
-fn run_postpass(_slice: &mut [u8], _width: u32, _height: u32, _p: &FilmProfile) {}
+// bloom / chromatic aberration that act on the finished image).
+fn run_postpass(slice: &mut [u8], width: u32, height: u32, p: &FilmProfile) {
+    apply_halation(slice, width, height, p);
+}
 
 // Image pipeline entry point for film profiles. When a profile only uses point
 // operations (the common case, and all current profiles) this reduces to a
@@ -1153,5 +1324,56 @@ mod tests {
                 "profile {name}: process_image diverged from process_filter"
             );
         }
+    }
+
+    // Halation is a neighbourhood effect: a single bright highlight on a dark
+    // field must bleed a warm glow into neighbouring pixels that were dark
+    // before. This is impossible for a pure point operation, so it exercises
+    // the postpass path specifically.
+    #[test]
+    fn halation_bleeds_glow_into_dark_neighbours() {
+        let (w, h) = (64u32, 64u32);
+        let mut buf = vec![0u8; (w * h * 3) as usize];
+        // A large bright white block; everything else pitch black.
+        for y in 24..40 {
+            for x in 24..40 {
+                let idx = ((y * w + x) * 3) as usize;
+                buf[idx] = 255;
+                buf[idx + 1] = 255;
+                buf[idx + 2] = 255;
+            }
+        }
+
+        // A neighbour immediately outside the block edge, initially fully black.
+        let probe = ((32 * w + 40) * 3) as usize;
+        assert_eq!(buf[probe], 0, "probe must start black");
+
+        // Strong warm halation. A full-brightness (255) highlight sits just
+        // above threshold, so it must produce a strong glow, not a faint one.
+        let p = FilmProfile {
+            halation_strength: 200,
+            halation_threshold: 180,
+            halation_r: 255,
+            halation_g: 120,
+            halation_b: 60,
+            ..Default::default()
+        };
+        apply_halation(&mut buf, w, h, &p);
+
+        // The glow near a maxed-out highlight must be substantial, not a token
+        // few levels. Before threshold normalisation this pixel only reached
+        // ~11; a pure-white source above threshold must now bloom much stronger.
+        assert!(
+            buf[probe] > 35,
+            "halation glow next to a white highlight too weak: red = {} (expected > 35)",
+            buf[probe]
+        );
+        // Warm tint: red grows more than blue.
+        assert!(
+            buf[probe] > buf[probe + 2],
+            "warm halation: red glow ({}) should exceed blue glow ({})",
+            buf[probe],
+            buf[probe + 2]
+        );
     }
 }
