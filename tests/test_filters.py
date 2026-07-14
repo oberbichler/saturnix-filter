@@ -206,3 +206,29 @@ def test_halation_bleeds_glow_from_highlight():
     # The probe gained glow, and the warm tint means red exceeds blue.
     assert buf[probe] > 0
     assert buf[probe] > buf[probe + 2]
+
+
+def test_cinestill_has_red_halation():
+    # Cinestill's signature is a red halation bloom around highlights. A dark
+    # pixel next to a bright block must end up redder than an identical dark
+    # pixel far from any highlight (isolating the neighbourhood bleed from the
+    # profile's uniform colour cast).
+    w, h = 96, 96
+    buf = bytearray(w * h * 3)  # all black
+    # Bright white block near one edge.
+    for y in range(10, 26):
+        for x in range(10, 26):
+            idx = (y * w + x) * 3
+            buf[idx] = buf[idx + 1] = buf[idx + 2] = 255
+
+    near = (18 * w + 28) * 3  # just right of the block
+    far = (80 * w + 80) * 3  # opposite corner, no highlight nearby
+
+    saturnix_filter.apply_film_inplace(buf, w, h, "S-Cinestill")
+
+    # The near pixel picks up the red halation glow; the far one does not.
+    assert buf[near] > buf[far], (
+        f"near red {buf[near]} should exceed far red {buf[far]}"
+    )
+    # The glow is red-dominant (warm halation).
+    assert buf[near] > buf[near + 2]

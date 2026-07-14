@@ -233,8 +233,9 @@ fn get_profile(name: &str) -> Option<FilmProfile> {
             ..Default::default()
         }),
         // Cinestill 800T: tungsten stock in daylight -> strong cool cast,
-        // teal-leaning shadows, cinematic contrast, noticeable grain.
-        // (Signature red halation bloom is a neighbourhood effect and not modelled here.)
+        // teal-leaning shadows, cinematic contrast, noticeable grain, plus the
+        // signature red halation bloom around highlights (from the film's
+        // removed anti-halation remjet layer), modelled via the halation postpass.
         "S-Cinestill" => Some(FilmProfile {
             color_r: 0.94,
             color_b: 1.12,
@@ -255,6 +256,13 @@ fn get_profile(name: &str) -> Option<FilmProfile> {
                 0.00, 0.97, 0.03, // out_g <- green, faint blue
                 0.05, 0.08, 0.90, // out_b <- blue + green/red bleed (teal)
             ],
+            // Signature red halation: a strongly red-weighted glow blooms out of
+            // bright highlights.
+            halation_strength: 130,
+            halation_threshold: 200,
+            halation_r: 255,
+            halation_g: 60,
+            halation_b: 40,
             ..Default::default()
         }),
         // Cross-processing (E-6 in C-41): exaggerated saturation, high contrast,
