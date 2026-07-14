@@ -42,6 +42,13 @@ struct FilmProfile {
     // pure black and white are preserved. Applies on both the colour and the
     // monochrome path (via the shared tone LUT).
     curve: f32,
+    // Light-leak colour added towards one corner, falling off with distance.
+    // 0/0/0 == no leak. `leak_corner` selects the origin corner: 0=top-left,
+    // 1=top-right, 2=bottom-left, 3=bottom-right.
+    leak_r: i32,
+    leak_g: i32,
+    leak_b: i32,
+    leak_corner: u8,
 }
 
 // Identity channel-mix matrix (no cross-channel mixing).
@@ -72,6 +79,10 @@ fn get_profile(name: &str) -> Option<FilmProfile> {
             tint_b: 1.0,
             mix: IDENTITY_MIX,
             curve: 0.0,
+            leak_r: 0,
+            leak_g: 0,
+            leak_b: 0,
+            leak_corner: 0,
         }),
         // Kodak Ektar: ultra-saturated. A slightly "unmixing" matrix pulls each
         // channel away from its neighbours to widen colour separation (Ektar's
@@ -105,6 +116,10 @@ fn get_profile(name: &str) -> Option<FilmProfile> {
                 -0.05, -0.07, 1.12, // out_b <- blue, minus red/green
             ],
             curve: 0.0,
+            leak_r: 0,
+            leak_g: 0,
+            leak_b: 0,
+            leak_corner: 0,
         }),
         "S-Natural" => Some(FilmProfile {
             color_r: 0.92,
@@ -129,6 +144,10 @@ fn get_profile(name: &str) -> Option<FilmProfile> {
             tint_b: 1.0,
             mix: IDENTITY_MIX,
             curve: 0.0,
+            leak_r: 0,
+            leak_g: 0,
+            leak_b: 0,
+            leak_corner: 0,
         }),
         "S-Saturnix" => Some(FilmProfile {
             color_r: 1.10,
@@ -153,6 +172,10 @@ fn get_profile(name: &str) -> Option<FilmProfile> {
             tint_b: 1.0,
             mix: IDENTITY_MIX,
             curve: 0.0,
+            leak_r: 0,
+            leak_g: 0,
+            leak_b: 0,
+            leak_corner: 0,
         }),
         "S-MonoX" => Some(FilmProfile {
             color_r: 0.25,
@@ -177,6 +200,10 @@ fn get_profile(name: &str) -> Option<FilmProfile> {
             tint_b: 1.0,
             mix: IDENTITY_MIX,
             curve: 0.0,
+            leak_r: 0,
+            leak_g: 0,
+            leak_b: 0,
+            leak_corner: 0,
         }),
         // Kodak Portra 400: warm, restrained saturation, flat forgiving curve,
         // clean slightly-warm shadows, soft highlight roll-off, fine grain.
@@ -203,6 +230,10 @@ fn get_profile(name: &str) -> Option<FilmProfile> {
             tint_b: 1.0,
             mix: IDENTITY_MIX,
             curve: 0.0,
+            leak_r: 0,
+            leak_g: 0,
+            leak_b: 0,
+            leak_corner: 0,
         }),
         // Cinestill 800T: tungsten stock in daylight -> strong cool cast,
         // teal-leaning shadows, cinematic contrast, noticeable grain.
@@ -238,6 +269,10 @@ fn get_profile(name: &str) -> Option<FilmProfile> {
                 0.05, 0.08, 0.90, // out_b <- blue + green/red bleed (teal)
             ],
             curve: 0.0,
+            leak_r: 0,
+            leak_g: 0,
+            leak_b: 0,
+            leak_corner: 0,
         }),
         // Cross-processing (E-6 in C-41): exaggerated saturation, high contrast,
         // yellow-green highlights and cyan-blue shadows, coarse grain.
@@ -273,6 +308,10 @@ fn get_profile(name: &str) -> Option<FilmProfile> {
                 0.06, 0.00, 0.98,  // out_b <- blue + a touch of red
             ],
             curve: 0.0,
+            leak_r: 0,
+            leak_g: 0,
+            leak_b: 0,
+            leak_corner: 0,
         }),
         // Faded / aged vintage print: milky lifted blacks, dulled highlights,
         // warm yellow-magenta cast, low saturation, flat compressed range.
@@ -299,6 +338,10 @@ fn get_profile(name: &str) -> Option<FilmProfile> {
             tint_b: 1.0,
             mix: IDENTITY_MIX,
             curve: 0.0,
+            leak_r: 0,
+            leak_g: 0,
+            leak_b: 0,
+            leak_corner: 0,
         }),
         // Bleach bypass (silver retention): heavily desaturated, very high
         // contrast, near-neutral slightly-cool metallic look, gritty grain.
@@ -325,6 +368,10 @@ fn get_profile(name: &str) -> Option<FilmProfile> {
             tint_b: 1.0,
             mix: IDENTITY_MIX,
             curve: 0.0,
+            leak_r: 0,
+            leak_g: 0,
+            leak_b: 0,
+            leak_corner: 0,
         }),
         // Sepia: warm brown-toned B&W. Neutral luminance is tinted towards
         // red/orange and away from blue.
@@ -351,6 +398,10 @@ fn get_profile(name: &str) -> Option<FilmProfile> {
             tint_b: 0.72,
             mix: IDENTITY_MIX,
             curve: 0.0,
+            leak_r: 0,
+            leak_g: 0,
+            leak_b: 0,
+            leak_corner: 0,
         }),
         // Cyanotype: cool blue-toned B&W. Neutral luminance is tinted towards
         // blue and away from red.
@@ -377,6 +428,10 @@ fn get_profile(name: &str) -> Option<FilmProfile> {
             tint_b: 1.25,
             mix: IDENTITY_MIX,
             curve: 0.0,
+            leak_r: 0,
+            leak_g: 0,
+            leak_b: 0,
+            leak_corner: 0,
         }),
         // Noir: high-contrast neutral B&W with a heavy vignette.
         "S-Noir" => Some(FilmProfile {
@@ -402,6 +457,10 @@ fn get_profile(name: &str) -> Option<FilmProfile> {
             tint_b: 1.0,
             mix: IDENTITY_MIX,
             curve: 0.0,
+            leak_r: 0,
+            leak_g: 0,
+            leak_b: 0,
+            leak_corner: 0,
         }),
         // Teal & Orange: cinematic look with warm highlights (orange skin/light)
         // and teal-pushed shadows.
@@ -428,6 +487,10 @@ fn get_profile(name: &str) -> Option<FilmProfile> {
             tint_b: 1.0,
             mix: IDENTITY_MIX,
             curve: 0.0,
+            leak_r: 0,
+            leak_g: 0,
+            leak_b: 0,
+            leak_corner: 0,
         }),
         // Lomo / toy camera: oversaturated, punchy, heavy vignette and grain.
         "S-Lomo" => Some(FilmProfile {
@@ -453,6 +516,10 @@ fn get_profile(name: &str) -> Option<FilmProfile> {
             tint_b: 1.0,
             mix: IDENTITY_MIX,
             curve: 0.0,
+            leak_r: 0,
+            leak_g: 0,
+            leak_b: 0,
+            leak_corner: 0,
         }),
         // Fujifilm Velvia: high-saturation landscape stock with strong greens
         // and blues and a punchy contrast curve. The mix separates green from
@@ -486,6 +553,10 @@ fn get_profile(name: &str) -> Option<FilmProfile> {
                 -0.02, -0.06, 1.08, // out_b <- blue, minus green (deeper skies)
             ],
             curve: 0.0,
+            leak_r: 0,
+            leak_g: 0,
+            leak_b: 0,
+            leak_corner: 0,
         }),
         // Selenium-toned B&W: cool, slightly purple tone.
         "S-Selenium" => Some(FilmProfile {
@@ -511,6 +582,10 @@ fn get_profile(name: &str) -> Option<FilmProfile> {
             tint_b: 1.10,
             mix: IDENTITY_MIX,
             curve: 0.0,
+            leak_r: 0,
+            leak_g: 0,
+            leak_b: 0,
+            leak_corner: 0,
         }),
         // Platinum / palladium print: warm-neutral, soft low-contrast tone with
         // a long tonal range.
@@ -537,6 +612,10 @@ fn get_profile(name: &str) -> Option<FilmProfile> {
             tint_b: 0.90,
             mix: IDENTITY_MIX,
             curve: 0.0,
+            leak_r: 0,
+            leak_g: 0,
+            leak_b: 0,
+            leak_corner: 0,
         }),
         // False-colour infrared (Aerochrome-style): the channel-mix routes the
         // green (foliage/IR) signal into red so vegetation renders crimson,
@@ -570,6 +649,10 @@ fn get_profile(name: &str) -> Option<FilmProfile> {
                 0.05, 0.10, 0.70, // out_b <- attenuated blue
             ],
             curve: 0.0,
+            leak_r: 0,
+            leak_g: 0,
+            leak_b: 0,
+            leak_corner: 0,
         }),
         // Split-toning: independent tints for highlights and shadows. Warm
         // (orange) highlights and cool (teal/blue) shadows - the classic
@@ -597,6 +680,10 @@ fn get_profile(name: &str) -> Option<FilmProfile> {
             tint_b: 1.0,
             mix: IDENTITY_MIX,
             curve: 0.0,
+            leak_r: 0,
+            leak_g: 0,
+            leak_b: 0,
+            leak_corner: 0,
         }),
         // Kodachrome: rich, warm reds, deep blues, punchy contrast. A mild mix
         // cleans the primaries; warm highlights and slightly cool shadows give
@@ -629,6 +716,10 @@ fn get_profile(name: &str) -> Option<FilmProfile> {
                 -0.02, -0.04, 1.06, // out_b <- deeper blue
             ],
             curve: 0.0,
+            leak_r: 0,
+            leak_g: 0,
+            leak_b: 0,
+            leak_corner: 0,
         }),
         // Polaroid / instant film: milky lifted blacks, soft contrast, a cyan
         // cast and a heavy vignette.
@@ -655,6 +746,10 @@ fn get_profile(name: &str) -> Option<FilmProfile> {
             tint_b: 1.0,
             mix: IDENTITY_MIX,
             curve: 0.0,
+            leak_r: 0,
+            leak_g: 0,
+            leak_b: 0,
+            leak_corner: 0,
         }),
         // The Matrix / digital-dystopia: dominant green cast driven by the
         // channel mix and green highlights.
@@ -686,6 +781,10 @@ fn get_profile(name: &str) -> Option<FilmProfile> {
                 0.00, 0.18, 0.82, // out_b <- some green
             ],
             curve: 0.0,
+            leak_r: 0,
+            leak_g: 0,
+            leak_b: 0,
+            leak_corner: 0,
         }),
         // Cinematic tone curve: a pronounced filmic S-curve gives a rich toe and
         // shoulder (deep-but-detailed shadows, gentle highlight roll-off) with a
@@ -713,6 +812,41 @@ fn get_profile(name: &str) -> Option<FilmProfile> {
             tint_b: 1.0,
             mix: IDENTITY_MIX,
             curve: 0.55,
+            leak_r: 0,
+            leak_g: 0,
+            leak_b: 0,
+            leak_corner: 0,
+        }),
+        // Light leak: a warm orange-red flare bleeds in from the top-right
+        // corner, over a mildly faded, warm base - the classic accidental
+        // film-exposure look.
+        "S-Leak" => Some(FilmProfile {
+            color_r: 1.05,
+            color_g: 1.00,
+            color_b: 0.95,
+            saturation: 1.10,
+            contrast: 1.02,
+            brightness: 1.00,
+            shadow_r: 6,
+            shadow_g: 2,
+            shadow_b: 0,
+            highlight_r: 0,
+            highlight_g: 0,
+            highlight_b: 0,
+            lift_shadows: 12,
+            compress_highlights: -4,
+            grain: 8,
+            vignette: 0.15,
+            is_monochrome: false,
+            tint_r: 1.0,
+            tint_g: 1.0,
+            tint_b: 1.0,
+            mix: IDENTITY_MIX,
+            curve: 0.0,
+            leak_r: 160,
+            leak_g: 70,
+            leak_b: 30,
+            leak_corner: 1,
         }),
         _ => None,
     }
@@ -789,7 +923,13 @@ impl SimpleRng {
 // Compile-Time specialize loop iterations using Rust Const Generics!
 // This completely removes branch 'if' statements from the inner loops, allowing
 // LLVM's auto-vectorizer to generate highly efficient SIMD (NEON/SSE/AVX) assembly instructions.
-fn process_filter_generic<const MONO: bool, const VIG: bool, const GRAIN: bool, const MIX: bool>(
+fn process_filter_generic<
+    const MONO: bool,
+    const VIG: bool,
+    const GRAIN: bool,
+    const MIX: bool,
+    const LEAK: bool,
+>(
     slice: &mut [u8],
     width: u32,
     height: u32,
@@ -864,6 +1004,19 @@ fn process_filter_generic<const MONO: bool, const VIG: bool, const GRAIN: bool, 
 
     let grain_w = p.grain as u32;
 
+    // Light-leak setup: origin corner and inverse falloff scale. The leak is a
+    // coloured additive term that is strongest at the chosen corner and decays
+    // with squared distance. Only used when LEAK is enabled.
+    let (leak_ox, leak_oy) = match p.leak_corner {
+        1 => (width as f32, 0.0),
+        2 => (0.0, height as f32),
+        3 => (width as f32, height as f32),
+        _ => (0.0, 0.0),
+    };
+    // Reach ~ half the diagonal; scaled to 2^16 for fixed-point falloff.
+    let leak_max_sq = (max_dist_sq).max(1.0);
+    let leak_scale = if LEAK { 65536.0 / leak_max_sq } else { 0.0 };
+
     // Parallel process image rows
     slice
         .par_chunks_mut((width * 3) as usize)
@@ -872,6 +1025,9 @@ fn process_filter_generic<const MONO: bool, const VIG: bool, const GRAIN: bool, 
             let y_f = y as f32;
             let dy = y_f - cy;
             let dy_sq = (dy * dy) as u64;
+
+            let leak_dy = y_f - leak_oy;
+            let leak_dy_sq = leak_dy * leak_dy;
 
             let mut rng = SimpleRng::new((y as u32).wrapping_add(1) ^ 123456789);
 
@@ -957,6 +1113,21 @@ fn process_filter_generic<const MONO: bool, const VIG: bool, const GRAIN: bool, 
                     b = (((b * (255 - grain_w) + noise * grain_w) * 257) >> 16).min(255);
                 }
 
+                // 6. Light leak: coloured additive term strongest at the chosen
+                // corner, decaying with squared distance (screen-like add).
+                if LEAK {
+                    let leak_dx = x as f32 - leak_ox;
+                    let dist_sq = leak_dx * leak_dx + leak_dy_sq;
+                    // falloff in [0, 1024]; 1024 at the corner, 0 past the reach.
+                    let f = 1024.0 - (dist_sq * leak_scale) * (1024.0 / 65536.0);
+                    if f > 0.0 {
+                        let fi = f as u32;
+                        r = (r + ((p.leak_r as u32 * fi) >> 10)).min(255);
+                        g = (g + ((p.leak_g as u32 * fi) >> 10)).min(255);
+                        b = (b + ((p.leak_b as u32 * fi) >> 10)).min(255);
+                    }
+                }
+
                 row[idx] = r as u8;
                 row[idx + 1] = g as u8;
                 row[idx + 2] = b as u8;
@@ -970,45 +1141,40 @@ fn process_filter(slice: &mut [u8], width: u32, height: u32, p: &FilmProfile) {
     let grain = p.grain > 0;
     // The channel mix only affects the colour path; ignore it for monochrome.
     let mix = !mono && p.mix != IDENTITY_MIX;
+    let leak = p.leak_r != 0 || p.leak_g != 0 || p.leak_b != 0;
 
-    // Dispatch compile-time specialized loop branches.
-    match (mono, vig, grain, mix) {
-        (true, true, true, _) => {
-            process_filter_generic::<true, true, true, false>(slice, width, height, p)
-        }
-        (true, true, false, _) => {
-            process_filter_generic::<true, true, false, false>(slice, width, height, p)
-        }
-        (true, false, true, _) => {
-            process_filter_generic::<true, false, true, false>(slice, width, height, p)
-        }
-        (true, false, false, _) => {
-            process_filter_generic::<true, false, false, false>(slice, width, height, p)
-        }
-        (false, true, true, false) => {
-            process_filter_generic::<false, true, true, false>(slice, width, height, p)
-        }
-        (false, true, true, true) => {
-            process_filter_generic::<false, true, true, true>(slice, width, height, p)
-        }
-        (false, true, false, false) => {
-            process_filter_generic::<false, true, false, false>(slice, width, height, p)
-        }
-        (false, true, false, true) => {
-            process_filter_generic::<false, true, false, true>(slice, width, height, p)
-        }
-        (false, false, true, false) => {
-            process_filter_generic::<false, false, true, false>(slice, width, height, p)
-        }
-        (false, false, true, true) => {
-            process_filter_generic::<false, false, true, true>(slice, width, height, p)
-        }
-        (false, false, false, false) => {
-            process_filter_generic::<false, false, false, false>(slice, width, height, p)
-        }
-        (false, false, false, true) => {
-            process_filter_generic::<false, false, false, true>(slice, width, height, p)
-        }
+    // Dispatch compile-time specialized loop branches. A local macro keeps the
+    // 2^5 const-generic combinations DRY.
+    macro_rules! dispatch {
+        ($mono:literal, $vig:literal, $grain:literal, $mix:literal, $leak:literal) => {
+            process_filter_generic::<$mono, $vig, $grain, $mix, $leak>(slice, width, height, p)
+        };
+    }
+    match (mono, vig, grain, mix, leak) {
+        (true, true, true, _, false) => dispatch!(true, true, true, false, false),
+        (true, true, true, _, true) => dispatch!(true, true, true, false, true),
+        (true, true, false, _, false) => dispatch!(true, true, false, false, false),
+        (true, true, false, _, true) => dispatch!(true, true, false, false, true),
+        (true, false, true, _, false) => dispatch!(true, false, true, false, false),
+        (true, false, true, _, true) => dispatch!(true, false, true, false, true),
+        (true, false, false, _, false) => dispatch!(true, false, false, false, false),
+        (true, false, false, _, true) => dispatch!(true, false, false, false, true),
+        (false, true, true, false, false) => dispatch!(false, true, true, false, false),
+        (false, true, true, false, true) => dispatch!(false, true, true, false, true),
+        (false, true, true, true, false) => dispatch!(false, true, true, true, false),
+        (false, true, true, true, true) => dispatch!(false, true, true, true, true),
+        (false, true, false, false, false) => dispatch!(false, true, false, false, false),
+        (false, true, false, false, true) => dispatch!(false, true, false, false, true),
+        (false, true, false, true, false) => dispatch!(false, true, false, true, false),
+        (false, true, false, true, true) => dispatch!(false, true, false, true, true),
+        (false, false, true, false, false) => dispatch!(false, false, true, false, false),
+        (false, false, true, false, true) => dispatch!(false, false, true, false, true),
+        (false, false, true, true, false) => dispatch!(false, false, true, true, false),
+        (false, false, true, true, true) => dispatch!(false, false, true, true, true),
+        (false, false, false, false, false) => dispatch!(false, false, false, false, false),
+        (false, false, false, false, true) => dispatch!(false, false, false, false, true),
+        (false, false, false, true, false) => dispatch!(false, false, false, true, false),
+        (false, false, false, true, true) => dispatch!(false, false, false, true, true),
     }
 }
 

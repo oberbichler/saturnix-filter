@@ -29,6 +29,7 @@ FILTERS = [
     "S-Polaroid",
     "S-Matrix",
     "S-Cine",
+    "S-Leak",
     "VHS",
 ]
 
@@ -153,6 +154,20 @@ def test_matrix_casts_green():
     r, g, b = first_pixel(buf)
     assert g > r
     assert g > b
+
+
+def test_leak_brightens_target_corner():
+    # A light leak adds coloured light towards its origin corner: the top-right
+    # pixel gains more red than the opposite (bottom-left) pixel.
+    buf = mid_gray_buffer()
+    saturnix_filter.apply_film_inplace(buf, WIDTH, HEIGHT, "S-Leak")
+    # top-right pixel
+    tr = (WIDTH - 1) * 3
+    r_tr = buf[tr]
+    # bottom-left pixel
+    bl = (WIDTH * (HEIGHT - 1)) * 3
+    r_bl = buf[bl]
+    assert r_tr > r_bl
 
 
 def test_cine_scurve_increases_contrast():
