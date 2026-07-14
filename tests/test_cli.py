@@ -129,3 +129,22 @@ def test_gallery_out_dir(cli, runner, tmp_path):
     assert result.exit_code == 0, result.output
     assert (out / "photo_original.jpg").exists()
     assert (out / "photo_s-gold.jpg").exists()
+
+
+def test_bench_runs_and_reports_timings(cli, runner):
+    # Small size and few repeats keep the test fast; it must still report a
+    # per-filter timing and exit cleanly.
+    result = runner.invoke(
+        cli,
+        ["bench", "--width", "64", "--height", "48", "--repeats", "2", "-f", "S-Gold"],
+    )
+    assert result.exit_code == 0, result.output
+    assert "S-Gold" in result.output
+    # A millisecond figure should appear in the output.
+    assert "ms" in result.output
+
+
+def test_bench_unknown_filter_suggests(cli, runner):
+    result = runner.invoke(cli, ["bench", "-f", "S-Nope"])
+    assert result.exit_code != 0
+    assert "Unknown filter" in result.output

@@ -37,7 +37,7 @@ def _build_cli():
     from rich.console import Console
     from rich.table import Table
 
-    from . import available_filters
+    from . import apply_film_inplace, available_filters
     from ._filters import describe
     from .convert import convert_file, default_output_path
 
@@ -179,6 +179,85 @@ def _build_cli():
             out = directory / f"{stem}_{name.lower()}.jpg"
             convert_file(image, out, name, quality=quality, max_width=width)
             console.print(f"[green][ok][/]  {out.name}")
+
+    # Representative default benchmark set: one profile per code path
+    # (monochrome, channel-mix, vignette+grain, light-leak, halation postpass)
+    # plus the VHS path.
+    _DEFAULT_BENCH_FILTERS = (
+        "S-MonoX",
+        "S-Vivid",
+        "S-Gold",
+        "S-Leak",
+        "S-Halation",
+        "VHS",
+    )
+
+    @cli.command()
+    @click.option(
+        "-f",
+        "--filter",
+        "filters",
+        multiple=True,
+        help="Filter to benchmark (repeatable). Default: a representative set.",
+    )
+    @click.option(
+        "--width", default=4656, show_default=True, help="Benchmark image width."
+    )
+    @click.option(
+        "--height", default=3496, show_default=True, help="Benchmark image height."
+    )
+    @click.option(
+        "--repeats",
+        default=5,
+        show_default=True,
+        help="Timed repetitions per filter (median is reported).",
+    )
+    def bench(filters, width, height, repeats) -> None:
+        """Benchmark filter throughput on a synthetic in-memory image.
+
+        Reports the median (and min/max) time per filter over REPEATS runs,
+        after one warm-up pass. Measures pure processing (no file I/O), matching
+        the numbers quoted in the README. Runs on the target hardware too.
+        """
+        import statistics
+        import time
+
+        names = list(filters) if filters else list(_DEFAULT_BENCH_FILTERS)
+        resolved = [resolve_filter(n) for n in names]
+
+        pixels = width * height
+        # A deterministic, non-uniform buffer so no code path is trivially
+        # optimised away.
+        base = bytes((i * 7 + 13) & 0xFF for i in range(768))
+        template = bytearray((base * ((pixels * 3) // 768 + 1))[: pixels * 3])
+
+        table = Table(title=f"Benchmark  {width}x{height}  ({repeats} repeats)")
+        table.add_column("Filter", style="bold cyan", no_wrap=True)
+        table.add_column("Median", justify="right")
+        table.add_column("Min", justify="right")
+        table.add_column("Max", justify="right")
+
+        for name in resolved:
+            # Warm-up (not timed).
+            buf = bytearray(template)
+            apply_film_inplace(buf, width, height, name)
+
+            samples = []
+            for _ in range(repeats):
+                buf = bytearray(template)
+                start = time.perf_counter()
+                apply_film_inplace(buf, width, height, name)
+                samples.append((time.perf_counter() - start) * 1000.0)
+
+            table.add_row(
+                name,
+                f"{statistics.median(samples):.1f} ms",
+                f"{min(samples):.1f} ms",
+                f"{max(samples):.1f} ms",
+            )
+            console.print(f"[dim]benchmarked {name}[/]")
+
+        console.print(table)
 
     return cli
 
